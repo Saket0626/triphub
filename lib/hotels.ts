@@ -1,85 +1,133 @@
 /**
  * Hotel search client.
  * SANDBOX_MODE=true → mock generator.
- * SANDBOX_MODE=false → Amadeus Hotel Search (Hotelbeds leftover keys are read but unused).
+ * SANDBOX_MODE=false → LiteAPI / Nuitee Connect (Amadeus self-service shut down 17 Jul 2026).
  *
- * TODO: Put your Amadeus API key and secret in .env.local as
- * AMADEUS_API_KEY and AMADEUS_API_SECRET
- * (Amadeus for Developers → My Self-Service Workspace → API Key / API Secret).
- * Docs: https://developers.amadeus.com/self-service/category/hotels/api-doc/hotel-search
- *
- * TODO (alternative): Hotelbeds — HOTELBEDS_API_KEY and HOTELBEDS_API_SECRET
- * if you prefer that inventory instead of Amadeus.
+ * Put your LiteAPI sandbox key in .env.local as LITEAPI_KEY
+ * Dashboard: https://connect.nuitee.com → Profile / API keys
+ * Docs: https://docs.liteapi.travel/reference/post_hotels-rates
  */
 
 import { env } from "@/lib/env";
 import { generateMockHotels } from "@/lib/mock-hotels";
+import { nightsBetween } from "@/lib/utils";
 import type { HotelOption, HotelPreferences, Trip } from "@/types";
+
+const FALLBACK_PHOTO =
+  "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80";
+
+type Money = { amount?: number; currency?: string };
+type LiteRate = {
+  name?: string;
+  retailRate?: { total?: Money[] };
+  cancellationPolicies?: unknown;
+};
+type LiteRoomType = { rates?: LiteRate[] };
+type LiteRateRow = { hotelId?: string; roomTypes?: LiteRoomType[] };
+type LiteHotelMeta = {
+  id?: string;
+  name?: string;
+  main_photo?: string;
+  thumbnail?: string;
+  address?: string;
+  city_name?: string;
+  stars?: number;
+  rating?: number;
+};
 
 export async function searchHotels(trip: Trip, prefs: HotelPreferences): Promise<HotelOption[]> {
   if (env.sandboxMode) {
     await new Promise((r) => setTimeout(r, 800));
     return generateMockHotels(trip, prefs);
   }
-  return searchAmadeus(trip, prefs);
+  return searchLiteApi(trip, prefs);
 }
 
-async function searchAmadeus(trip: Trip, prefs: HotelPreferences): Promise<HotelOption[]> {
-  // TODO: AMADEUS_API_KEY / AMADEUS_API_SECRET are read here.
-  if (!env.amadeusApiKey || env.amadeusApiKey.includes("your_amadeus")) {
-    throw new Error("AMADEUS_API_KEY is missing. Add it to .env.local to search live hotels.");
+async function searchLiteApi(trip: Trip, prefs: HotelPreferences): Promise<HotelOption[]> {
+  const key = env.liteApiKey;
+  if (!key || key.includes("your_liteapi") || key.length < 8) {
+    throw new Error("LITEAPI_KEY is missing. Add it to .env.local (Nuitee Connect → API keys).");
   }
 
-  const tokenRes = await fetch("https://test.api.amadeus.com/v1/security/oauth2/token", {
+  const city = trip.destinationLabel.split("(")[0].trim();
+  const checkout = trip.returnDate ?? trip.departureDate;
+  const nights = nightsBetween(trip.departureDate, checkout);
+  const childrenAges = Array.from({ length: trip.childCount }, () => 8);
+
+  const body: Record<string, unknown> = {
+    iataCode: trip.destinationCode,
+    checkin: trip.departureDate,
+    checkout,
+    currency: "USD",
+    guestNationality: "US",
+    occupancies: [
+      {
+        rooms: prefs.rooms,
+        adults: Math.max(trip.adultCount, 1),
+        ...(childrenAges.length ? { children: childrenAges } : {}),
+      },
+    ],
+    timeout: 8,
+    maxRatesPerHotel: 1,
+    limit: 9,
+    includeHotelData: true,
+  };
+  if (prefs.starRating !== "no_preference") {
+    body.starRating = [Number(prefs.starRating)];
+  }
+
+  const res = await fetch("https://api.liteapi.travel/v3.0/hotels/rates", {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: env.amadeusApiKey,
-      client_secret: env.amadeusApiSecret,
-    }),
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-API-Key": key,
+    },
+    body: JSON.stringify(body),
   });
-  if (!tokenRes.ok) {
-    throw new Error(`Amadeus auth failed (${tokenRes.status})`);
-  }
-  const tokenJson = (await tokenRes.json()) as { access_token: string };
 
-  const city = trip.destinationCode;
-  const url = new URL("https://test.api.amadeus.com/v3/shopping/hotel-offers");
-  url.searchParams.set("cityCode", city);
-  url.searchParams.set("checkInDate", trip.departureDate);
-  url.searchParams.set("checkOutDate", trip.returnDate ?? trip.departureDate);
-  url.searchParams.set("adults", String(trip.adultCount));
-  url.searchParams.set("roomQuantity", String(prefs.rooms));
-
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${tokenJson.access_token}` },
-  });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Amadeus hotel search failed (${res.status}): ${text}`);
+    throw new Error(`LiteAPI hotel search failed (${res.status}): ${text}`);
   }
-  const json = (await res.json()) as { data?: Array<Record<string, unknown>> };
-  const cityName = trip.destinationLabel.split("(")[0].trim();
+
+  const json = (await res.json()) as {
+    data?: LiteRateRow[];
+    hotels?: LiteHotelMeta[];
+  };
+
+  const hotelsById = new Map((json.hotels ?? []).map((h) => [String(h.id), h]));
 
   return (json.data ?? []).slice(0, 9).map((row) => {
-    const hotel = (row.hotel as Record<string, unknown>) ?? {};
-    const offers = (row.offers as Array<Record<string, unknown>> | undefined) ?? [];
-    const price = Number((offers[0]?.price as Record<string, unknown> | undefined)?.total ?? 200);
+    const meta = hotelsById.get(String(row.hotelId)) ?? {};
+    const rate = row.roomTypes?.[0]?.rates?.[0];
+    const money = rate?.retailRate?.total?.[0];
+    const amount = Number(money?.amount ?? 0);
+    const perNight =
+      nights > 0 ? Math.round(amount / nights) || Math.round(amount) : Math.round(amount);
+    const name = String(meta.name ?? "Hotel");
+    const stars = Number(meta.stars ?? meta.rating ?? 4);
+    const neighborhood = String(meta.city_name ?? meta.address ?? city);
+    const photo = String(meta.main_photo || meta.thumbnail || FALLBACK_PHOTO);
+    const cancel =
+      typeof rate?.cancellationPolicies === "string"
+        ? rate.cancellationPolicies
+        : "See live LiteAPI offer for cancellation terms.";
+
     return {
-      id: String(hotel.hotelId ?? crypto.randomUUID()),
-      name: String(hotel.name ?? "Hotel"),
-      stars: Number(hotel.rating ?? 4),
-      neighborhood: String((hotel.address as Record<string, unknown> | undefined)?.cityName ?? cityName),
-      city: cityName,
-      pricePerNight: Math.round(price),
-      totalPrice: Math.round(price),
-      currency: "USD",
+      id: String(row.hotelId ?? crypto.randomUUID()),
+      name,
+      stars: Number.isFinite(stars) ? stars : 4,
+      neighborhood,
+      city,
+      pricePerNight: perNight || 180,
+      totalPrice: Math.round(amount) || perNight * nights,
+      currency: String(money?.currency ?? "USD"),
       amenities: [],
-      cancellationPolicy: "See live Amadeus offer for cancellation terms.",
-      whyItFits: "Live Amadeus result for your dates and destination.",
-      photoUrl: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80",
-      photoAlt: String(hotel.name ?? "Hotel"),
+      cancellationPolicy: cancel,
+      whyItFits: "Live LiteAPI result for your dates and destination.",
+      photoUrl: photo,
+      photoAlt: name,
     };
   });
 }

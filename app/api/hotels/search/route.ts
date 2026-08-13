@@ -1,4 +1,4 @@
-/** Hotel search API — sandbox mocks, or Amadeus when SANDBOX_MODE=false. */
+/** Hotel search API — sandbox mocks, or LiteAPI when SANDBOX_MODE=false. */
 
 import { NextResponse } from "next/server";
 import { z } from "zod";

@@ -1,6 +1,6 @@
 # Hotelbeds (optional hotel inventory)
 
-Use this **instead of** Amadeus if you prefer Hotelbeds. Keys are read today but the live path in `lib/hotels.ts` calls Amadeus. Swap that function when you choose Hotelbeds.
+Hotelbeds is an optional hotel inventory source. TripHub’s live hotel path uses **LiteAPI** (`lib/hotels.ts`). Leave these keys blank unless you switch providers.
 
 **Signup:** https://developer.hotelbeds.com  
 **Docs:** https://developer.hotelbeds.com/documentation/hotels/booking-api/
@@ -22,4 +22,4 @@ Typical hosts:
 ## Code
 
 - Env wiring: `lib/env.ts`
-- Integration TODO sits next to the Amadeus path in `lib/hotels.ts`
+- Live search currently uses LiteAPI, not Hotelbeds. See [LITEAPI.md](./LITEAPI.md).

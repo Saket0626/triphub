@@ -11,6 +11,7 @@ export const env = {
   supabaseAnonKey: read("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
   supabaseServiceRoleKey: read("SUPABASE_SERVICE_ROLE_KEY"),
   duffelApiKey: read("DUFFEL_API_KEY"),
+  liteApiKey: read("LITEAPI_KEY"),
   amadeusApiKey: read("AMADEUS_API_KEY"),
   amadeusApiSecret: read("AMADEUS_API_SECRET"),
   hotelbedsApiKey: read("HOTELBEDS_API_KEY"),
@@ -18,6 +19,8 @@ export const env = {
   resendApiKey: read("RESEND_API_KEY"),
   emailFrom: read("EMAIL_FROM", "TripHub <booking@localhost>"),
   stripeSecretKey: read("STRIPE_SECRET_KEY"),
+  stripePublishableKey: read("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"),
+  appUrl: read("APP_URL", read("NEXT_PUBLIC_APP_URL", "http://localhost:3000")),
 };
 
 export function isPlaceholder(value: string) {

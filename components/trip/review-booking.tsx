@@ -31,7 +31,13 @@ function itineraryTotal(bundle: TripBundle) {
   return flight + hotel + ground + activities;
 }
 
-export function ReviewBooking({ bundle }: { bundle: TripBundle }) {
+export function ReviewBooking({
+  bundle,
+  canceled = false,
+}: {
+  bundle: TripBundle;
+  canceled?: boolean;
+}) {
   const router = useRouter();
   const [reviewed, setReviewed] = useState(false);
   const [open, setOpen] = useState(false);
@@ -54,6 +60,10 @@ export function ReviewBooking({ bundle }: { bundle: TripBundle }) {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Booking failed");
+      if (json.checkoutUrl) {
+        window.location.href = json.checkoutUrl;
+        return;
+      }
       router.push(`/trip/${bundle.trip.id}/confirmation`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Booking failed");
@@ -141,6 +151,9 @@ export function ReviewBooking({ bundle }: { bundle: TripBundle }) {
         <Checkbox checked={reviewed} onCheckedChange={(c) => setReviewed(Boolean(c))} className="mt-1" />
         <span className="text-sm">I have reviewed all the details above and confirm they are correct</span>
       </label>
+      {canceled ? (
+        <p className="mt-3 text-sm text-destructive">Payment was canceled. Nothing was booked.</p>
+      ) : null}
       {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
         <Button variant="outline" onClick={() => router.push(`/trip/${bundle.trip.id}/activities`)}>
@@ -155,8 +168,8 @@ export function ReviewBooking({ bundle }: { bundle: TripBundle }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm booking</AlertDialogTitle>
             <AlertDialogDescription>
-              This will book {route} and {hotelName} for {formatCurrency(total)}. This cannot be undone in sandbox
-              mode without starting over. Are you sure?
+              This will book {route} and {hotelName} for {formatCurrency(total)}. You’ll pay on Stripe
+              with a test card (4242 4242 4242 4242). Continue?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

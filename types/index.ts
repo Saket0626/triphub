@@ -225,6 +225,7 @@ export interface ItinerarySnapshot {
   ground: GroundOption | null;
   activities: ActivityOption[];
   totalPrice: number;
+  stripeCheckoutSessionId?: string;
 }
 
 export interface TripBundle {

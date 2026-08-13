@@ -34,6 +34,10 @@ yarn-error.log*
 # sandbox local database
 .data/
 
+# local key dump (never commit)
+API/KEYS.local.md
+/tmp/triphub-db-pass.txt
+
 # vercel
 .vercel
 

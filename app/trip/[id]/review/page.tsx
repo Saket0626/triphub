@@ -6,8 +6,14 @@ import { ReviewBooking } from "@/components/trip/review-booking";
 
 export const runtime = "nodejs";
 
-export default async function ReviewPage({ params }: { params: { id: string } }) {
+export default async function ReviewPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { canceled?: string };
+}) {
   const bundle = await getTripBundle(params.id);
   if (!bundle) notFound();
-  return <ReviewBooking bundle={bundle} />;
+  return <ReviewBooking bundle={bundle} canceled={searchParams.canceled === "1"} />;
 }

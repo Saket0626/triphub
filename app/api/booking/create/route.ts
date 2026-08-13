@@ -1,12 +1,10 @@
-/** Create a booking after the final confirmation gate. Sandbox simulates processing; live mode is TODO. */
+/** Start booking: Stripe Checkout when keys are set, otherwise sandbox mock. */
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createBooking, getTripBundle } from "@/lib/db";
-import { sendConfirmationEmail } from "@/lib/email";
-import { env } from "@/lib/env";
-import { generateConfirmationNumber } from "@/lib/utils";
-import type { ItinerarySnapshot } from "@/types";
+import { finalizeTripBooking } from "@/lib/booking";
+import { getTripBundle } from "@/lib/db";
+import { getStripe, isStripeConfigured, requestOrigin } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
@@ -27,51 +25,52 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Flight and hotel must be confirmed first" }, { status: 400 });
     }
 
-    if (env.sandboxMode) {
-      await new Promise((r) => setTimeout(r, 2000));
-    } else {
-      // TODO: Create a Duffel order with the selected offer id (DUFFEL_API_KEY).
-      // POST https://api.duffel.com/air/orders  — see https://duffel.com/docs/api/orders/create-order
-      // TODO: Charge the traveler with Stripe (STRIPE_SECRET_KEY) before confirming the order.
-      // TODO: Confirm the hotel booking with Amadeus Hotel Booking or Hotelbeds Booking API.
+    if (isStripeConfigured()) {
+      const flight = bundle.flightSelection.offer;
+      const hotel = bundle.hotelSelection.offer;
+      const ground =
+        bundle.groundSelection?.choice === "yes" ? bundle.groundSelection.option : null;
+      const activities = bundle.activitySelection?.skipped
+        ? []
+        : bundle.activitySelection?.options ?? [];
+      const totalPrice =
+        flight.totalPrice +
+        hotel.totalPrice +
+        (ground?.priceEstimate ?? 0) +
+        activities.reduce((s, a) => s + a.totalPrice, 0);
+      const amount = Math.max(50, Math.round(totalPrice * 100));
+      const origin = requestOrigin(request);
+      const destination = bundle.trip.destinationLabel.split("(")[0].trim();
+
+      const session = await getStripe().checkout.sessions.create({
+        mode: "payment",
+        customer_email: bundle.trip.contactEmail,
+        client_reference_id: tripId,
+        metadata: { tripId },
+        success_url: `${origin}/trip/${tripId}/confirmation?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/trip/${tripId}/review?canceled=1`,
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: "usd",
+              unit_amount: amount,
+              product_data: {
+                name: `TripHub trip to ${destination}`,
+                description: `${flight.airline} ${flight.flightNumber} · ${hotel.name}`,
+              },
+            },
+          },
+        ],
+      });
+
+      if (!session.url) {
+        throw new Error("Stripe Checkout did not return a payment URL.");
+      }
+      return NextResponse.json({ checkoutUrl: session.url });
     }
 
-    const flight = bundle.flightSelection.offer;
-    const hotel = bundle.hotelSelection.offer;
-    const ground = bundle.groundSelection?.choice === "yes" ? bundle.groundSelection.option : null;
-    const activities = bundle.activitySelection?.skipped ? [] : bundle.activitySelection?.options ?? [];
-    const totalPrice =
-      flight.totalPrice +
-      hotel.totalPrice +
-      (ground?.priceEstimate ?? 0) +
-      activities.reduce((s, a) => s + a.totalPrice, 0);
-
-    const itinerarySnapshot: ItinerarySnapshot = {
-      trip: bundle.trip,
-      travelers: bundle.travelers,
-      flight,
-      hotel,
-      ground,
-      activities,
-      totalPrice,
-    };
-
-    const booking = await createBooking(tripId, {
-      tripId,
-      confirmationNumber: generateConfirmationNumber(),
-      totalPrice,
-      currency: "USD",
-      sandbox: env.sandboxMode,
-      itinerarySnapshot,
-      createdAt: new Date().toISOString(),
-    });
-
-    try {
-      await sendConfirmationEmail(booking, bundle.trip.contactEmail);
-    } catch (emailError) {
-      console.error("Confirmation email failed", emailError);
-    }
-
+    const booking = await finalizeTripBooking(tripId);
     return NextResponse.json({ booking });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Booking failed";
