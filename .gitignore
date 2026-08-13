@@ -38,6 +38,9 @@ yarn-error.log*
 API/KEYS.local.md
 /tmp/triphub-db-pass.txt
 
+# supabase CLI cache
+supabase/.temp/
+
 # vercel
 .vercel
 

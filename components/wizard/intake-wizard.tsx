@@ -21,6 +21,7 @@ import { Input, Label, Textarea } from "@/components/ui/input";
 import { Checkbox, RadioGroup, RadioGroupItem, Switch } from "@/components/ui/form-controls";
 import { Field } from "@/components/ui/misc";
 import { AirportAutocomplete, DualSlider, Stepper } from "@/components/wizard/fields";
+import { StepReveal } from "@/components/motion/reveal";
 import { ConfirmActions, IntakeProgress, SectionHeader, StepNav } from "@/components/wizard/progress";
 
 const STORAGE_KEY = "triphub:intake-draft";
@@ -122,8 +123,9 @@ export function IntakeWizard() {
   }
 
   return (
-    <div className="animate-fade-up">
+    <div>
       <IntakeProgress current={step} />
+      <StepReveal stepKey={step}>
       {step === 0 ? (
         <BasicsStep
           value={basics}
@@ -160,6 +162,7 @@ export function IntakeWizard() {
           error={saveError}
         />
       ) : null}
+      </StepReveal>
     </div>
   );
 }
@@ -202,7 +205,7 @@ function BasicsStep({
       <SectionHeader
         eyebrow="Step A"
         title="Where are you going?"
-        description="Tell us the route and dates. Nothing is searched or booked until you confirm on the last screen."
+        description="City, dates, the usual. We'll search after you look this over at the end."
       />
       <div className="grid gap-6">
         <Field label="Departure city / airport" error={form.formState.errors.departureCode?.message}>
@@ -236,7 +239,7 @@ function BasicsStep({
             className="grid gap-2 sm:grid-cols-3"
           >
             {(["round_trip", "one_way", "multi_city"] as const).map((t) => (
-              <label key={t} className="flex cursor-pointer items-center gap-3 rounded-xl border bg-white px-4 py-3">
+              <label key={t} className="option-row">
                 <RadioGroupItem value={t} />
                 <span>{TRIP_TYPE_LABELS[t]}</span>
               </label>
@@ -261,7 +264,7 @@ function BasicsStep({
             </Field>
           ) : null}
         </div>
-        <div className="flex items-center justify-between rounded-xl border bg-white px-4 py-3">
+        <div className="flex items-center justify-between rounded-xl border border-border bg-white px-4 py-3">
           <Label htmlFor="flex">My dates are flexible by a few days</Label>
           <Switch
             id="flex"
@@ -285,7 +288,7 @@ function BasicsStep({
         ) : null}
         <Field label="Trip purpose (optional)" hint="Used later to tailor hotel and activity recommendations.">
           <select
-            className="flex h-11 w-full rounded-xl border border-input bg-white px-3 text-sm"
+            className="control"
             value={form.watch("tripPurpose") ?? ""}
             onChange={(e) => form.setValue("tripPurpose", e.target.value as TripBasicsInput["tripPurpose"])}
           >
@@ -350,11 +353,11 @@ function TravelersStep({
     >
       <SectionHeader
         eyebrow="Step B"
-        title="Who is traveling?"
-        description="Names and dates of birth must match government ID. Airlines use this for ticketing."
+        title="Who's coming?"
+        description="Names and birthdays like they are on the ID — airlines are picky about that."
       />
       <div className="grid gap-6">
-        <Field label="Contact email" hint="We’ll send the itinerary and confirmation here. Nothing is emailed until you book." error={form.formState.errors.contactEmail?.message}>
+        <Field label="Contact email" hint="We'll send the itinerary here after you book. Nothing goes out before that." error={form.formState.errors.contactEmail?.message}>
           <Input type="email" placeholder="you@example.com" {...form.register("contactEmail")} />
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -489,7 +492,7 @@ function PrefsStep({
       <SectionHeader
         eyebrow="Step C"
         title="How do you like to fly?"
-        description="These shape the search ranking. They are preferences, not silent defaults — you will still choose a specific flight."
+        description="Seats, stops, budget. We'll use this to rank options. You still pick the actual flight."
       />
       <div className="grid gap-8">
         <Field label="Preferred cabin class" error={form.formState.errors.cabinClass?.message}>
@@ -498,7 +501,7 @@ function PrefsStep({
             onValueChange={(v) => form.setValue("cabinClass", v as FlightPreferencesInput["cabinClass"])}
           >
             {(Object.keys(CABIN_NOTES) as Array<keyof typeof CABIN_NOTES>).map((key) => (
-              <label key={key} className="flex cursor-pointer items-start gap-3 rounded-xl border bg-white px-4 py-3">
+              <label key={key} className="option-row items-start">
                 <RadioGroupItem value={key} className="mt-1" />
                 <span>
                   <span className="block font-medium">{CABIN_NOTES[key].label}</span>
@@ -521,7 +524,7 @@ function PrefsStep({
           </label>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {AIRLINES.map((airline) => (
-              <label key={airline} className="flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-sm">
+              <label key={airline} className="option-row px-3 py-2">
                 <Checkbox
                   checked={airlines.includes(airline)}
                   onCheckedChange={(c) => {
@@ -542,7 +545,7 @@ function PrefsStep({
             className="grid gap-2 sm:grid-cols-2"
           >
             {(Object.keys(STOP_LABELS) as Array<keyof typeof STOP_LABELS>).map((key) => (
-              <label key={key} className="flex items-center gap-3 rounded-xl border bg-white px-4 py-3">
+              <label key={key} className="option-row">
                 <RadioGroupItem value={key} />
                 {STOP_LABELS[key]}
               </label>
@@ -551,7 +554,7 @@ function PrefsStep({
         </Field>
         <Field label="Preferred departure time — outbound">
           <select
-            className="flex h-11 w-full rounded-xl border bg-white px-3 text-sm"
+            className="control"
             value={form.watch("outboundTimeWindow")}
             onChange={(e) =>
               form.setValue("outboundTimeWindow", e.target.value as FlightPreferencesInput["outboundTimeWindow"])
@@ -567,7 +570,7 @@ function PrefsStep({
         {isRoundTrip ? (
           <Field label="Preferred departure time — return">
             <select
-              className="flex h-11 w-full rounded-xl border bg-white px-3 text-sm"
+              className="control"
               value={form.watch("returnTimeWindow")}
               onChange={(e) =>
                 form.setValue("returnTimeWindow", e.target.value as FlightPreferencesInput["returnTimeWindow"])
@@ -600,7 +603,7 @@ function PrefsStep({
             className="grid grid-cols-3 gap-2"
           >
             {(["window", "aisle", "no_preference"] as const).map((s) => (
-              <label key={s} className="flex items-center gap-2 rounded-xl border bg-white px-3 py-3 text-sm capitalize">
+              <label key={s} className="option-row px-3 py-3 capitalize">
                 <RadioGroupItem value={s} />
                 {s.replace("_", " ")}
               </label>
@@ -698,8 +701,8 @@ function ReviewStep({
     <div>
       <SectionHeader
         eyebrow="Step D"
-        title="Review trip basics"
-        description="Read this carefully. Searching for flights starts only when you confirm below — not before."
+        title="Does this look right?"
+        description="Quick check. We'll start looking at flights after you confirm."
       />
       <div className="grid gap-4">
         {summary.map((section) => (

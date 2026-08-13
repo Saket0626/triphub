@@ -4,28 +4,35 @@
 
 @layer base {
   :root {
-    --background: 40 33% 97%;
-    --foreground: 24 12% 12%;
-    --card: 40 50% 99%;
-    --card-foreground: 24 12% 12%;
-    --popover: 40 50% 99%;
-    --popover-foreground: 24 12% 12%;
-    --primary: 174 64% 26%;
-    --primary-foreground: 40 33% 98%;
-    --secondary: 36 24% 93%;
-    --secondary-foreground: 24 12% 18%;
-    --muted: 36 18% 93%;
-    --muted-foreground: 24 8% 42%;
-    --accent: 174 30% 92%;
-    --accent-foreground: 174 64% 20%;
-    --destructive: 8 62% 42%;
+    --overwing: 0 0% 100%;
+    --cabin: 0 0% 100%;
+    --soundings: 222 47% 11%;
+    --channel: 199 89% 44%;
+    --chart: 199 89% 44%;
+    --pencil: 215 14% 40%;
+
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 199 89% 44%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 20% 97%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 20% 97%;
+    --muted-foreground: 215 14% 40%;
+    --accent: 199 95% 94%;
+    --accent-foreground: 199 90% 28%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --book: 24 72% 38%;
-    --book-foreground: 40 40% 98%;
-    --border: 32 18% 86%;
-    --input: 32 18% 86%;
-    --ring: 174 64% 26%;
-    --radius: 0.9rem;
+    --book: 199 89% 44%;
+    --book-foreground: 0 0% 100%;
+    --border: 214 18% 91%;
+    --input: 214 18% 91%;
+    --ring: 199 89% 44%;
+    --radius: 1rem;
   }
 
   * {
@@ -36,17 +43,50 @@
     scroll-behavior: smooth;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    .group:hover img {
+      transform: none !important;
+    }
+  }
+
   body {
-    @apply bg-background text-foreground antialiased;
-    font-feature-settings: "ss01" on, "cv11" on;
+    @apply bg-white text-soundings antialiased;
+  }
+
+  ::selection {
+    background: hsl(var(--channel) / 0.16);
+  }
+
+  input[type="range"] {
+    accent-color: hsl(var(--channel));
+  }
+}
+
+@layer components {
+  .control {
+    @apply flex h-11 w-full rounded-xl border border-input bg-white px-3 text-sm text-soundings
+      placeholder:text-pencil focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-channel
+      focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .option-row {
+    @apply flex cursor-pointer items-center gap-3 rounded-2xl border border-border bg-white px-4 py-3 text-sm
+      transition-colors hover:border-channel/50 has-[:checked]:border-channel has-[:checked]:ring-2 has-[:checked]:ring-channel/20;
+  }
+
+  .hero-wash {
+    background:
+      radial-gradient(ellipse 70% 55% at 85% -10%, hsl(199 89% 44% / 0.1), transparent 58%),
+      radial-gradient(ellipse 45% 40% at 0% 0%, hsl(199 95% 94% / 0.85), transparent 52%);
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
-  }
-  .shadow-card {
-    box-shadow: 0 1px 2px rgba(28, 25, 23, 0.04), 0 12px 32px rgba(28, 25, 23, 0.06);
   }
 }

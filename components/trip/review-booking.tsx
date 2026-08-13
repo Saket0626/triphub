@@ -75,8 +75,8 @@ export function ReviewBooking({
     <div className="animate-fade-up">
       <SectionHeader
         eyebrow="Final review"
-        title="Everything that will be booked"
-        description="This is the last gate. Read every line. The book button stays off until you check the box."
+        title="Last look"
+        description="This is everything. Check the box, then book."
       />
       <div className="grid gap-4">
         <Line
@@ -149,7 +149,7 @@ export function ReviewBooking({
       </Card>
       <label className="mt-8 flex items-start gap-3 rounded-2xl border bg-card p-4">
         <Checkbox checked={reviewed} onCheckedChange={(c) => setReviewed(Boolean(c))} className="mt-1" />
-        <span className="text-sm">I have reviewed all the details above and confirm they are correct</span>
+        <span className="text-sm">Yep, I looked this over and it looks right</span>
       </label>
       {canceled ? (
         <p className="mt-3 text-sm text-destructive">Payment was canceled. Nothing was booked.</p>
@@ -157,25 +157,25 @@ export function ReviewBooking({
       {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
         <Button variant="outline" onClick={() => router.push(`/trip/${bundle.trip.id}/activities`)}>
-          Go back and change something
+          Go back
         </Button>
         <Button variant="book" size="xl" disabled={!reviewed || loading} onClick={() => setOpen(true)}>
-          Book This Trip
+          Book this trip
         </Button>
       </div>
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm booking</AlertDialogTitle>
+            <AlertDialogTitle>One last yes</AlertDialogTitle>
             <AlertDialogDescription>
-              This will book {route} and {hotelName} for {formatCurrency(total)}. You’ll pay on Stripe
-              with a test card (4242 4242 4242 4242). Continue?
+              You&apos;re about to book {route} and {hotelName} for {formatCurrency(total)}. You&apos;ll pay
+              on Stripe with a test card (4242 4242 4242 4242). Sound good?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={book} disabled={loading}>
-              {loading ? "Booking…" : "Yes, Book It"}
+              {loading ? "Booking…" : "Yes, book it"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

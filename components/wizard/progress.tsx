@@ -30,22 +30,24 @@ const STATUS_ORDER: TripStatus[] = ["draft", "flights", "hotels", "ground", "act
 
 export function IntakeProgress({ current }: { current: number }) {
   return (
-    <ol className="mb-10 grid grid-cols-4 gap-2">
+    <ol className="mb-12 grid grid-cols-4 gap-3">
       {INTAKE_STEPS.map((step, i) => {
         const done = i < current;
         const active = i === current;
         return (
-          <li key={step.id} className="flex flex-col gap-2">
-            <div
-              className={cn(
-                "h-1 rounded-full",
-                done || active ? "bg-primary" : "bg-border"
-              )}
-            />
+          <li key={step.id} className="flex flex-col items-start gap-2">
             <span
               className={cn(
-                "text-[11px] uppercase tracking-[0.14em]",
-                active ? "text-primary" : "text-muted-foreground"
+                "flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold",
+                done || active ? "bg-channel text-white" : "bg-secondary text-pencil"
+              )}
+            >
+              {done ? <Check className="h-4 w-4" strokeWidth={2.5} /> : i + 1}
+            </span>
+            <span
+              className={cn(
+                "text-[13px] leading-tight",
+                active ? "font-medium text-soundings" : "text-pencil"
               )}
             >
               {step.label}
@@ -74,14 +76,14 @@ export function JourneyProgress({ tripId, status }: { tripId: string; status: Tr
                 <Link
                   href={step.href(tripId)}
                   className={cn(
-                    "rounded-full px-3 py-1 text-xs tracking-wide",
-                    active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"
+                    "rounded-full px-3 py-1.5 text-sm",
+                    active ? "bg-channel text-white" : "text-pencil hover:bg-secondary hover:text-soundings"
                   )}
                 >
                   {i + 1}. {step.label}
                 </Link>
               ) : (
-                <span className="rounded-full px-3 py-1 text-xs text-muted-foreground/50">
+                <span className="rounded-full px-3 py-1.5 text-sm text-pencil/50">
                   {i + 1}. {step.label}
                 </span>
               )}
@@ -128,7 +130,7 @@ export function ConfirmActions({
   confirmLabel,
   onConfirm,
   onBack,
-  backLabel = "Go back and change something",
+  backLabel = "Go back",
   loading,
   confirmVariant = "confirm",
   disabled,
@@ -171,9 +173,9 @@ export function SectionHeader({
   return (
     <header className="mb-8 max-w-2xl">
       {eyebrow ? (
-        <p className="mb-2 text-xs uppercase tracking-[0.22em] text-primary">{eyebrow}</p>
+        <p className="mb-3 text-[13px] font-medium uppercase tracking-[0.18em] text-channel">{eyebrow}</p>
       ) : null}
-      <h1 className="font-serif text-3xl font-medium tracking-tight text-balance sm:text-4xl">{title}</h1>
+      <h1 className="font-serif text-3xl font-normal tracking-tight text-balance text-soundings sm:text-[2.5rem] sm:leading-tight">{title}</h1>
       {description ? <p className="mt-3 text-muted-foreground">{description}</p> : null}
     </header>
   );
@@ -196,8 +198,8 @@ export function ChoiceCard({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "w-full rounded-2xl border bg-card p-5 text-left shadow-card transition hover:-translate-y-0.5",
-        selected ? "border-primary ring-2 ring-primary/20" : "border-border",
+        "w-full rounded-2xl border border-black/[0.06] bg-white p-5 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors",
+        selected ? "border-chart ring-2 ring-chart/30" : "border-border hover:border-channel/40",
         disabled && "opacity-50"
       )}
     >
@@ -208,7 +210,7 @@ export function ChoiceCard({
 
 export function DoneMark() {
   return (
-    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+    <span className="inline-flex h-5 w-5 items-center justify-center rounded-sm bg-chart text-book-foreground">
       <Check className="h-3 w-3" />
     </span>
   );

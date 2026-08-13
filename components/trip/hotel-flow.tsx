@@ -67,8 +67,8 @@ function HotelPrefForm({
     <form onSubmit={form.handleSubmit(save)} className="animate-fade-up">
       <SectionHeader
         eyebrow="Hotels"
-        title="What should the stay feel like?"
-        description="Confirm these preferences first. We will not show hotels until you do — and nothing is pre-selected."
+        title="What's the stay like?"
+        description="Tell us what you want first. Then we'll show hotels — nothing's picked for you."
       />
       <div className="grid gap-6">
         <Field label="Number of rooms">
@@ -167,8 +167,8 @@ function HotelResults({ bundle }: { bundle: TripBundle }) {
   if (loading) {
     return (
       <div className="py-16 text-center">
-        <p className="text-xs uppercase tracking-[0.2em] text-primary">Researching</p>
-        <h1 className="mt-3 font-serif text-3xl">Finding stays that fit your list…</h1>
+        <p className="text-sm font-medium text-channel">One sec</p>
+        <h1 className="mt-3 text-3xl font-semibold">Finding stays…</h1>
       </div>
     );
   }
@@ -178,15 +178,15 @@ function HotelResults({ bundle }: { bundle: TripBundle }) {
     <div className="animate-fade-up">
       <SectionHeader
         eyebrow="Hotels"
-        title="Recommendations — not a default"
-        description="The top card is a suggestion. You must click a hotel to select it; nothing is pre-chosen."
+        title="Here are some stays"
+        description="Tap one you like. The top one is just a suggestion."
       />
       <div className="grid gap-5">
         {hotels.map((hotel, i) => (
-          <Card key={hotel.id}>
+          <Card key={hotel.id} className="overflow-hidden">
             <button type="button" className="grid w-full gap-0 text-left sm:grid-cols-[220px_1fr]" onClick={() => setSelected(hotel)}>
               <div
-                className="h-40 bg-cover bg-center sm:h-full sm:rounded-l-2xl"
+                className="h-44 bg-cover bg-center sm:h-full"
                 style={{ backgroundImage: `url(${hotel.photoUrl})` }}
                 role="img"
                 aria-label={hotel.photoAlt}
@@ -194,8 +194,8 @@ function HotelResults({ bundle }: { bundle: TripBundle }) {
               <CardContent className="space-y-2 pt-6">
                 {i === 0 ? (
                   <div>
-                    <Badge variant="recommend">Our top recommendation</Badge>
-                    <p className="mt-2 text-sm text-muted-foreground">A suggestion only — tap the card to choose it.</p>
+                    <Badge variant="recommend">Looks like a great fit</Badge>
+                    <p className="mt-2 text-sm text-muted-foreground">Just a starting pick — tap to choose it.</p>
                   </div>
                 ) : null}
                 <h2 className="font-serif text-xl">{hotel.name}</h2>

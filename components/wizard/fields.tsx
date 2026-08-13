@@ -51,7 +51,7 @@ export function AirportAutocomplete({
         onFocus={() => setOpen(true)}
       />
       {open ? (
-        <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-xl border bg-card p-1 shadow-card">
+        <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-border bg-white p-1 shadow-lg">
           {results.length === 0 ? (
             <li className="px-3 py-2 text-sm text-muted-foreground">No airports match that search.</li>
           ) : (
@@ -59,7 +59,7 @@ export function AirportAutocomplete({
               <li key={airport.code}>
                 <button
                   type="button"
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-secondary"
+                  className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-secondary focus-visible:bg-secondary"
                   onClick={() => {
                     onChange(airport);
                     setQuery(airportLabel(airport));
@@ -93,12 +93,12 @@ export function Stepper({
   label: string;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border bg-white px-4 py-3">
+    <div className="flex items-center justify-between rounded-xl border border-border bg-white px-4 py-3">
       <span className="text-sm">{label}</span>
       <div className="flex items-center gap-3">
         <button
           type="button"
-          className="h-8 w-8 rounded-full border hover:bg-secondary"
+          className="h-8 w-8 rounded-full border border-border hover:bg-secondary focus-visible:ring-2 focus-visible:ring-chart"
           onClick={() => onChange(Math.max(min, value - 1))}
           aria-label={`Decrease ${label}`}
         >
@@ -107,7 +107,7 @@ export function Stepper({
         <span className="w-6 text-center font-medium">{value}</span>
         <button
           type="button"
-          className="h-8 w-8 rounded-full border hover:bg-secondary"
+          className="h-8 w-8 rounded-full border border-border hover:bg-secondary focus-visible:ring-2 focus-visible:ring-chart"
           onClick={() => onChange(Math.min(max, value + 1))}
           aria-label={`Increase ${label}`}
         >

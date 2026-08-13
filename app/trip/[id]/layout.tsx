@@ -18,7 +18,7 @@ export default async function TripLayout({
   if (!bundle) notFound();
 
   return (
-    <PageShell>
+    <PageShell width="default">
       <p className="mb-2 text-sm text-muted-foreground">
         {bundle.trip.departureCode} → {bundle.trip.destinationCode}
         <span className="mx-2">·</span>

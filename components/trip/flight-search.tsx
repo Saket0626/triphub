@@ -76,8 +76,8 @@ export function FlightSearch({ bundle }: { bundle: TripBundle }) {
   if (loading) {
     return (
       <div className="animate-fade-up py-16 text-center">
-        <p className="text-xs uppercase tracking-[0.2em] text-primary">Researching</p>
-        <h1 className="mt-3 font-serif text-3xl">Searching flights based on your preferences…</h1>
+        <p className="text-sm font-medium text-channel">One sec</p>
+        <h1 className="mt-3 text-3xl font-semibold">Looking at flights for you…</h1>
         <p className="mt-3 text-muted-foreground">
           {bundle.trip.departureCode} → {bundle.trip.destinationCode} · {formatDate(bundle.trip.departureDate)}
         </p>
@@ -93,8 +93,8 @@ export function FlightSearch({ bundle }: { bundle: TripBundle }) {
     <div className="animate-fade-up">
       <SectionHeader
         eyebrow="Flights"
-        title="Choose an itinerary"
-        description="Sorted by best match to what you told us. Nothing is held until you confirm on the next screen."
+        title="Pick a flight"
+        description="Sorted by what you asked for. Nothing's held until you confirm."
       />
       <div className="mb-6 flex flex-wrap gap-3">
         <select className="h-10 rounded-full border bg-white px-3 text-sm" value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
@@ -126,7 +126,7 @@ export function FlightSearch({ bundle }: { bundle: TripBundle }) {
             <CardContent className="pt-6">
               {i === 0 && sort === "best" ? (
                 <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <Badge variant="recommend">Recommended for you</Badge>
+                  <Badge variant="recommend">Nice match</Badge>
                   <p className="text-sm text-muted-foreground">{flight.recommendReason}</p>
                 </div>
               ) : null}
@@ -156,7 +156,7 @@ export function FlightSearch({ bundle }: { bundle: TripBundle }) {
                 Select this flight
               </Button>
               <p className="text-center text-xs text-muted-foreground">
-                Selecting does not book it. You will confirm on the next screen.
+                This doesn&apos;t book it yet. You&apos;ll confirm next.
               </p>
             </div>
           ) : null}

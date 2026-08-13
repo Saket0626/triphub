@@ -39,8 +39,8 @@ export default async function ConfirmationPage({
 
   return (
     <div className="animate-fade-up py-6 text-center">
-      <p className="text-xs uppercase tracking-[0.22em] text-primary">Booked</p>
-      <h1 className="mt-3 font-serif text-4xl">You’re all set</h1>
+      <p className="text-sm text-chart">Booked</p>
+      <h1 className="mt-3 text-4xl font-semibold">You’re all set</h1>
       <p className="mt-3 text-muted-foreground">
         Confirmation <span className="font-medium text-foreground">{booking.confirmationNumber}</span>
       </p>
