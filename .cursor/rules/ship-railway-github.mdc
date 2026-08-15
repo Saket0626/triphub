@@ -1,0 +1,12 @@
+---
+description: After each user-requested change, deploy to Railway; also push GitHub unless the change is a secret/API key.
+alwaysApply: true
+---
+
+# Ship TripHub after every change
+
+When you finish work the user asked for:
+
+1. **Railway** — deploy with `railway up` (do not wait to be asked).
+2. **GitHub** — commit and push, except when the change is an **API key, token, password, or other secret**. Secrets go to Railway and `.env.local` only.
+3. Never commit `.env.local`, `API/KEYS.local.md`, or real key values. Docs and `API/env.template` may show placeholder names only.

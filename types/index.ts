@@ -54,6 +54,48 @@ export interface Traveler {
   sortOrder: number;
 }
 
+export type LoyaltyKind = "airline" | "hotel" | "other";
+
+export interface LoyaltyMembership {
+  id: string;
+  tripId: string;
+  programId: string;
+  programLabel: string;
+  kind: LoyaltyKind;
+  memberNumber: string | null;
+  balance: number;
+}
+
+export type ResearchKind = "hotel" | "activity" | "general";
+
+export interface ResearchFinding {
+  id: string;
+  kind: ResearchKind;
+  title: string;
+  summary: string;
+  sourceUrl: string;
+  sourceName: string;
+  relatedNames: string[];
+}
+
+export interface DestinationResearch {
+  deals: ResearchFinding[];
+  events: ResearchFinding[];
+  localFavorites: ResearchFinding[];
+  fetchedAt: string;
+  expiresAt: string;
+  source: "mock" | "anthropic";
+}
+
+export interface PlaceSnapshot {
+  placeId?: string;
+  rating?: number;
+  ratingCount?: number;
+  hoursSummary?: string;
+  openNow?: boolean | null;
+  businessStatus?: string;
+}
+
 export interface TripPreferences {
   id: string;
   tripId: string;
@@ -162,6 +204,8 @@ export interface HotelOption {
   whyItFits: string;
   photoUrl: string;
   photoAlt: string;
+  place?: PlaceSnapshot;
+  liveInsights?: ResearchFinding[];
 }
 
 export interface HotelSelection {
@@ -196,6 +240,12 @@ export interface ActivityOption {
   pricePerPerson: number;
   totalPrice: number;
   category: string;
+  productCode?: string;
+  photoUrl?: string;
+  rating?: number;
+  reviewCount?: number;
+  place?: PlaceSnapshot;
+  liveInsights?: ResearchFinding[];
 }
 
 export interface ActivitySelection {
@@ -233,6 +283,7 @@ export interface TripBundle {
   travelers: Traveler[];
   preferences: TripPreferences | null;
   hotelPreferences: HotelPreferences | null;
+  loyaltyWallets: LoyaltyMembership[];
   flightSelection: FlightSelection | null;
   hotelSelection: HotelSelection | null;
   groundSelection: GroundSelection | null;

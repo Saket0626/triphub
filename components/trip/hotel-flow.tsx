@@ -8,7 +8,7 @@ import { hotelPreferencesSchema, type HotelPreferencesInput } from "@/lib/valida
 import { HOTEL_MUST_HAVES } from "@/lib/labels";
 import { formatCurrency, nightsBetween } from "@/lib/utils";
 import { pendingKey, setPending } from "@/lib/pending";
-import type { HotelOption, TripBundle } from "@/types";
+import type { HotelOption, ResearchFinding, TripBundle } from "@/types";
 import { Badge, Field } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +16,9 @@ import { Checkbox } from "@/components/ui/form-controls";
 import { Sheet, SheetContent } from "@/components/ui/dialog";
 import { DualSlider, Stepper } from "@/components/wizard/fields";
 import { SectionHeader } from "@/components/wizard/progress";
+import { LiveInsightBadge, PlaceMeta, SandboxNote, WorthKnowingPanel } from "@/components/trip/discovery";
+import { PointsCompare } from "@/components/trip/points-compare";
+import { compareHotelPoints } from "@/lib/loyalty";
 
 export function HotelFlow({ bundle }: { bundle: TripBundle }) {
   const [prefs, setPrefs] = useState(bundle.hotelPreferences);
@@ -131,6 +134,8 @@ function HotelResults({ bundle }: { bundle: TripBundle }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [hotels, setHotels] = useState<HotelOption[]>([]);
+  const [worthKnowing, setWorthKnowing] = useState<ResearchFinding[]>([]);
+  const [sandbox, setSandbox] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<HotelOption | null>(null);
   const nights = nightsBetween(bundle.trip.departureDate, bundle.trip.returnDate);
@@ -146,7 +151,11 @@ function HotelResults({ bundle }: { bundle: TripBundle }) {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Search failed");
-        if (!cancelled) setHotels(json.hotels);
+        if (!cancelled) {
+          setHotels(json.hotels);
+          setWorthKnowing(json.worthKnowing ?? []);
+          setSandbox(Boolean(json.sandbox));
+        }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Search failed");
       } finally {
@@ -181,6 +190,7 @@ function HotelResults({ bundle }: { bundle: TripBundle }) {
         title="Here are some stays"
         description="Tap one you like. The top one is just a suggestion."
       />
+      {sandbox ? <SandboxNote inventory="stays" research="destination" /> : null}
       <div className="grid gap-5">
         {hotels.map((hotel, i) => (
           <Card key={hotel.id} className="overflow-hidden">
@@ -202,6 +212,7 @@ function HotelResults({ bundle }: { bundle: TripBundle }) {
                 <p className="text-sm text-muted-foreground">
                   {"★".repeat(hotel.stars)} · {hotel.neighborhood}
                 </p>
+                <PlaceMeta {...hotel.place} />
                 <p className="text-sm">{hotel.whyItFits}</p>
                 <p className="text-xs text-muted-foreground">
                   {hotel.amenities.slice(0, 3).map((a) => HOTEL_MUST_HAVES.find((h) => h.id === a)?.label ?? a).join(" · ")}
@@ -210,9 +221,16 @@ function HotelResults({ bundle }: { bundle: TripBundle }) {
                 <p className="text-xs text-muted-foreground">{formatCurrency(hotel.totalPrice)} total for {nights} night{nights > 1 ? "s" : ""}</p>
               </CardContent>
             </button>
+            <div className="space-y-3 px-6 pb-6">
+              {(hotel.liveInsights ?? []).map((finding) => (
+                <LiveInsightBadge key={finding.id} finding={finding} />
+              ))}
+              <PointsCompare comparisons={compareHotelPoints(hotel, bundle.loyaltyWallets ?? [])} />
+            </div>
           </Card>
         ))}
       </div>
+      <WorthKnowingPanel findings={worthKnowing} />
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <SheetContent>
           {selected ? (

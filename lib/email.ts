@@ -1,8 +1,7 @@
 /**
  * Confirmation email via Resend.
- *
- * TODO: Put your Resend API key in .env.local as RESEND_API_KEY
- * and set EMAIL_FROM to a verified domain sender.
+ * Sending-only API key is enough. Until a custom domain is verified in Resend,
+ * use TripHub <onboarding@resend.dev> (delivers to the account owner only).
  * Docs: https://resend.com/docs/send-with-nodejs
  */
 
@@ -37,18 +36,18 @@ function renderItineraryEmail(booking: Booking) {
   const flight = snap.flight;
   const hotel = snap.hotel;
   const sandboxNote = booking.sandbox
-    ? `<p style="background:#f4efe6;padding:12px 16px;border-radius:8px;color:#5c4a32;font-size:14px;">This is a <strong>sandbox / test booking</strong>. Nothing was charged and no real tickets were issued.</p>`
+    ? `<p style="background:#e0f2fe;padding:12px 16px;border-radius:12px;color:#0c4a6e;font-size:14px;line-height:1.45;">This is a <strong>test booking</strong>. Nothing was charged and no real tickets were issued.</p>`
     : "";
 
   return `<!doctype html>
 <html>
-<body style="font-family:Georgia,serif;background:#f7f4ef;color:#1c1917;padding:32px;">
-  <div style="max-width:560px;margin:0 auto;background:#fff;padding:32px;border-radius:16px;">
-    <p style="letter-spacing:0.2em;text-transform:uppercase;font-size:11px;color:#0f766e;">TripHub</p>
-    <h1 style="font-weight:500;font-size:28px;">You're all set</h1>
-    <p>Confirmation <strong>${booking.confirmationNumber}</strong></p>
+<body style="font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#ffffff;color:#0f172a;padding:32px;">
+  <div style="max-width:560px;margin:0 auto;background:#ffffff;padding:32px;border:1px solid #e2e8f0;border-radius:20px;">
+    <p style="letter-spacing:0.16em;text-transform:uppercase;font-size:12px;font-weight:600;color:#0284c7;margin:0 0 12px;">TripHub</p>
+    <h1 style="font-weight:600;font-size:28px;margin:0 0 8px;">You're all set</h1>
+    <p style="color:#475569;">Confirmation <strong style="color:#0f172a;">${booking.confirmationNumber}</strong></p>
     ${sandboxNote}
-    <hr style="border:none;border-top:1px solid #e7e0d6;margin:24px 0;" />
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
     <p><strong>Travelers</strong><br/>${snap.travelers.map((t) => t.fullName).join(", ")}</p>
     ${
       flight
@@ -70,7 +69,7 @@ function renderItineraryEmail(booking: Booking) {
         ? `<p><strong>Activities</strong><br/>${snap.activities.map((a) => `${a.name} · ${formatCurrency(a.totalPrice)}`).join("<br/>")}</p>`
         : "<p><strong>Activities</strong><br/>None added</p>"
     }
-    <p style="font-size:20px;margin-top:24px;">Total ${formatCurrency(snap.totalPrice)}</p>
+    <p style="font-size:20px;font-weight:600;margin-top:24px;">Total ${formatCurrency(snap.totalPrice)}</p>
   </div>
 </body>
 </html>`;

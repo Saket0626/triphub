@@ -11,7 +11,13 @@
 | API key | `RESEND_API_KEY` | `re_xxxxxxxx` |
 | From address | `EMAIL_FROM` | `TripHub <booking@yourdomain.com>` |
 
-On localhost without a verified domain, Resend only delivers to the account owner’s email. For Railway, verify a domain first.
+TripHub uses a **sending-only** Resend key (free tier). `recruiter.solutions` is **not** verified on this account, so the from-address is:
+
+`EMAIL_FROM=TripHub <onboarding@resend.dev>`
+
+That onboarding sender is free and only delivers to the Resend account owner (`saket.amanana@gmail.com`). Do not upgrade the plan. To send to other inboxes later, add DNS for a domain you already own at https://resend.com/domains (verification is free; buying a domain is not).
+
+The key cannot list domains or create new keys — send-only is the right restriction.
 
 ## Endpoint
 

@@ -16,35 +16,44 @@ export function SiteHeader({
     <header className="sticky top-0 z-40 border-b border-black/[0.06] bg-white/80 backdrop-blur-xl">
       <div
         className={cn(
-          "mx-auto flex items-center justify-between gap-4 px-5 py-3.5 sm:px-8",
-          landing ? "max-w-6xl" : width === "desk" ? "max-w-desk" : "max-w-5xl"
+          "mx-auto items-center gap-4 px-5 py-3.5 sm:px-8",
+          landing
+            ? "grid max-w-[1440px] grid-cols-[1fr_auto_1fr]"
+            : cn("flex justify-between", width === "desk" ? "max-w-desk" : "max-w-5xl")
         )}
       >
         <Link
           href="/"
-          className="flex items-center gap-2.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-channel"
+          className={cn(
+            "flex items-center gap-2.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-channel",
+            landing && "justify-self-start"
+          )}
         >
           <BrandMark />
           <span className="text-[17px] font-semibold tracking-tight text-soundings">TripHub</span>
         </Link>
         {landing ? (
-          <nav className="hidden items-center gap-9 text-[13px] font-medium text-pencil sm:flex">
-            <a href="#how" className="transition-colors hover:text-soundings">
-              How it works
-            </a>
-            <a href="#why" className="transition-colors hover:text-soundings">
-              Why it&apos;s different
-            </a>
-          </nav>
+          <div className="flex justify-center justify-self-center">
+            <nav className="hidden items-center gap-9 text-[13px] font-bold text-soundings sm:flex">
+              <a href="#how" className="transition-colors hover:text-channel">
+                How it works
+              </a>
+              <a href="#research" className="transition-colors hover:text-channel">
+                Research
+              </a>
+            </nav>
+          </div>
         ) : (
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-pencil">
             {env.sandboxMode ? "Sandbox" : "Live"}
           </p>
         )}
         {landing ? (
-          <Button asChild size="sm">
-            <Link href="/trip/new">Get started</Link>
-          </Button>
+          <div className="justify-self-end">
+            <Button asChild size="sm">
+              <Link href="/trip/new">Get started</Link>
+            </Button>
+          </div>
         ) : null}
       </div>
     </header>

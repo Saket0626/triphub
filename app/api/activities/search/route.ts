@@ -1,10 +1,10 @@
-/** Hotel search API — LiteAPI/mock inventory, Places snapshots, research merge. */
+/** Activity search — Viator-shaped inventory (mock until partner key), plus research merge. */
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCachedResearch, getTripBundle, saveCachedResearch } from "@/lib/db";
-import { searchHotelsWithPlaces } from "@/lib/hotels";
-import { attachHotelInsights, unmatchedFindings } from "@/lib/insights";
+import { searchActivities } from "@/lib/activities";
+import { attachActivityInsights, unmatchedFindings } from "@/lib/insights";
 import { researchCacheKey, runDestinationResearch } from "@/lib/research";
 import { env } from "@/lib/env";
 
@@ -16,25 +16,25 @@ export async function POST(request: Request) {
   try {
     const { tripId } = bodySchema.parse(await request.json());
     const bundle = await getTripBundle(tripId);
-    if (!bundle?.hotelPreferences) {
-      return NextResponse.json({ error: "Confirm hotel preferences first" }, { status: 400 });
+    if (!bundle) {
+      return NextResponse.json({ error: "Trip not found" }, { status: 404 });
     }
 
     const cacheKey = researchCacheKey(bundle.trip);
-    const [hotels, cached] = await Promise.all([
-      searchHotelsWithPlaces(bundle.trip, bundle.hotelPreferences),
+    const [{ activities, inventorySource }, cached] = await Promise.all([
+      searchActivities(bundle.trip),
       getCachedResearch(cacheKey),
     ]);
     const research = cached ?? (await runDestinationResearch(bundle.trip));
     if (!cached) await saveCachedResearch(bundle.trip, cacheKey, research);
 
-    const withInsights = attachHotelInsights(hotels, research);
-    const used = withInsights.flatMap((h) => h.liveInsights ?? []);
+    const withInsights = attachActivityInsights(activities, research);
+    const used = withInsights.flatMap((a) => a.liveInsights ?? []);
     return NextResponse.json({
-      hotels: withInsights,
+      activities: withInsights,
       worthKnowing: unmatchedFindings(research, used),
       research,
-      inventorySource: env.sandboxMode ? "mock" : "liteapi",
+      inventorySource,
       researchSource: research.source,
       sandbox: env.sandboxMode,
     });

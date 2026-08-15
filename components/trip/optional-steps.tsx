@@ -1,15 +1,16 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import type { ActivityOption, GroundOption, TripBundle } from "@/types";
-import { generateActivities, generateGroundOptions } from "@/lib/mock-extras";
+import type { ActivityOption, GroundOption, ResearchFinding, TripBundle } from "@/types";
+import { generateGroundOptions } from "@/lib/mock-extras";
 import { formatCurrency } from "@/lib/utils";
 import { pendingKey, setPending } from "@/lib/pending";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PHOTOS } from "@/components/brand/travel-photo";
 import { ChoiceCard, ConfirmActions, SectionHeader } from "@/components/wizard/progress";
+import { LiveInsightBadge, PlaceMeta, SandboxNote, WorthKnowingPanel } from "@/components/trip/discovery";
 
 const ACTIVITY_PHOTOS: Record<string, string> = {
   Tour: PHOTOS.city.src,
@@ -99,8 +100,40 @@ export function GroundFlow({ bundle }: { bundle: TripBundle }) {
 
 export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
   const router = useRouter();
-  const suggestions = useMemo(() => generateActivities(bundle.trip), [bundle.trip]);
+  const [suggestions, setSuggestions] = useState<ActivityOption[]>([]);
+  const [worthKnowing, setWorthKnowing] = useState<ResearchFinding[]>([]);
+  const [sandbox, setSandbox] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<ActivityOption[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      try {
+        const res = await fetch("/api/activities/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tripId: bundle.trip.id }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Search failed");
+        if (!cancelled) {
+          setSuggestions(json.activities ?? []);
+          setWorthKnowing(json.worthKnowing ?? []);
+          setSandbox(Boolean(json.sandbox));
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Search failed");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [bundle.trip.id]);
 
   function toggle(option: ActivityOption) {
     setPicked((cur) => (cur.some((x) => x.id === option.id) ? cur.filter((x) => x.id !== option.id) : [...cur, option]));
@@ -111,6 +144,16 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
     router.push(`/trip/${bundle.trip.id}/activities/confirm`);
   }
 
+  if (loading) {
+    return (
+      <div className="py-16 text-center">
+        <p className="text-sm font-medium text-channel">One sec</p>
+        <h1 className="mt-3 text-3xl font-semibold">Looking for things to do…</h1>
+      </div>
+    );
+  }
+  if (error) return <p className="text-destructive">{error}</p>;
+
   return (
     <div className="animate-fade-up">
       <SectionHeader
@@ -118,32 +161,47 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
         title="Want stuff to do?"
         description="A few ideas for the destination. Skip anything. Nothing gets added until you confirm."
       />
+      {sandbox ? <SandboxNote inventory="tours" research="destination" /> : null}
       <div className="grid gap-3">
         {suggestions.map((activity) => (
-          <ChoiceCard key={activity.id} selected={picked.some((p) => p.id === activity.id)} onClick={() => toggle(activity)}>
-            <div className="flex items-start gap-4">
-              <div
-                className="h-20 w-24 shrink-0 rounded-xl bg-cover bg-center"
-                style={{
-                  backgroundImage: `url(${ACTIVITY_PHOTOS[activity.category] ?? PHOTOS.city.src})`,
-                }}
-                role="img"
-                aria-label={activity.name}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-channel">{activity.category}</p>
-                <p className="font-medium">{activity.name}</p>
-                <p className="text-sm text-muted-foreground">{activity.description}</p>
-                <p className="mt-1 text-xs">{activity.duration}</p>
+          <div key={activity.id}>
+            <ChoiceCard selected={picked.some((p) => p.id === activity.id)} onClick={() => toggle(activity)}>
+              <div className="flex items-start gap-4">
+                <div
+                  className="h-20 w-24 shrink-0 rounded-xl bg-cover bg-center"
+                  style={{
+                    backgroundImage: `url(${activity.photoUrl || ACTIVITY_PHOTOS[activity.category] || PHOTOS.city.src})`,
+                  }}
+                  role="img"
+                  aria-label={activity.name}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium uppercase tracking-wide text-channel">{activity.category}</p>
+                  <p className="font-medium">{activity.name}</p>
+                  <p className="text-sm text-muted-foreground">{activity.description}</p>
+                  <p className="mt-1 text-xs">{activity.duration}</p>
+                  <PlaceMeta
+                    rating={activity.place?.rating ?? activity.rating}
+                    ratingCount={activity.place?.ratingCount ?? activity.reviewCount}
+                    hoursSummary={activity.place?.hoursSummary}
+                    businessStatus={activity.place?.businessStatus}
+                  />
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-xl font-semibold">{formatCurrency(activity.pricePerPerson)}</p>
+                  <p className="text-xs text-muted-foreground">per person</p>
+                </div>
               </div>
-              <div className="shrink-0 text-right">
-                <p className="text-xl font-semibold">{formatCurrency(activity.pricePerPerson)}</p>
-                <p className="text-xs text-muted-foreground">per person</p>
-              </div>
+            </ChoiceCard>
+            <div className="mt-2 space-y-2">
+              {(activity.liveInsights ?? []).map((finding) => (
+                <LiveInsightBadge key={finding.id} finding={finding} />
+              ))}
             </div>
-          </ChoiceCard>
+          </div>
         ))}
       </div>
+      <WorthKnowingPanel findings={worthKnowing} />
       <div className="mt-8 flex flex-wrap gap-3">
         <Button variant="outline" onClick={() => go(true)}>
           Skip this step

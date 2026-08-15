@@ -10,7 +10,9 @@ These are **our** HTTP APIs, served by Next.js. Not third-party.
 | POST | `/api/flights/search` | Mock or Duffel search | After intake confirm |
 | POST | `/api/trips/[id]/flight` | Save chosen flight | Yes |
 | POST | `/api/trips/[id]/hotel-preferences` | Save hotel prefs | Yes |
-| POST | `/api/hotels/search` | Mock or LiteAPI search | After hotel prefs confirm |
+| POST | `/api/hotels/search` | Mock or LiteAPI search + Places + research | After hotel prefs confirm |
+| POST | `/api/activities/search` | Viator-shaped inventory + research | After ground step |
+| POST | `/api/research/destination` | Claude/mock research, 24h cache | — |
 | POST | `/api/trips/[id]/hotel` | Save chosen hotel | Yes |
 | POST | `/api/trips/[id]/ground` | Save or skip ground | Yes |
 | POST | `/api/trips/[id]/activities` | Save or skip activities | Yes |

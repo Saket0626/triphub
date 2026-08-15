@@ -131,3 +131,15 @@ async function searchLiteApi(trip: Trip, prefs: HotelPreferences): Promise<Hotel
     };
   });
 }
+
+export async function searchHotelsWithPlaces(trip: Trip, prefs: HotelPreferences) {
+  const { lookupPlace } = await import("@/lib/places");
+  const hotels = await searchHotels(trip, prefs);
+  const enriched = await Promise.all(
+    hotels.map(async (hotel) => ({
+      ...hotel,
+      place: await lookupPlace(`${hotel.name} ${hotel.city}`),
+    }))
+  );
+  return enriched;
+}

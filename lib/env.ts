@@ -21,6 +21,9 @@ export const env = {
   stripeSecretKey: read("STRIPE_SECRET_KEY"),
   stripePublishableKey: read("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"),
   appUrl: read("APP_URL", read("NEXT_PUBLIC_APP_URL", "http://localhost:3000")),
+  viatorApiKey: read("VIATOR_API_KEY"),
+  googlePlacesApiKey: read("GOOGLE_PLACES_API_KEY"),
+  anthropicApiKey: read("ANTHROPIC_API_KEY"),
 };
 
 export function isPlaceholder(value: string) {

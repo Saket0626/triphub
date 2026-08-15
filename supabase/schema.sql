@@ -103,6 +103,30 @@ create table if not exists public.bookings (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.loyalty_wallets (
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid not null references public.trips(id) on delete cascade,
+  program_id text not null,
+  program_label text not null,
+  kind text not null default 'other',
+  member_number text,
+  balance int not null default 0
+);
+
+create table if not exists public.destination_research_cache (
+  id uuid primary key default gen_random_uuid(),
+  cache_key text not null unique,
+  destination_code text not null,
+  destination_label text not null,
+  departure_date date not null,
+  return_date date,
+  trip_purpose text,
+  payload jsonb not null,
+  source text not null default 'mock',
+  fetched_at timestamptz not null default now(),
+  expires_at timestamptz not null
+);
+
 alter table public.trips enable row level security;
 alter table public.travelers enable row level security;
 alter table public.trip_preferences enable row level security;
@@ -112,6 +136,8 @@ alter table public.hotel_selections enable row level security;
 alter table public.ground_selections enable row level security;
 alter table public.activity_selections enable row level security;
 alter table public.bookings enable row level security;
+alter table public.loyalty_wallets enable row level security;
+alter table public.destination_research_cache enable row level security;
 
 -- Open policies for the sandbox prototype (tighten before going live with auth).
 do $$
@@ -120,7 +146,7 @@ begin
   foreach t in array array[
     'trips','travelers','trip_preferences','hotel_preferences',
     'flight_selections','hotel_selections','ground_selections',
-    'activity_selections','bookings'
+    'activity_selections','bookings','loyalty_wallets','destination_research_cache'
   ]
   loop
     execute format('drop policy if exists "public read %1$s" on public.%1$s', t);

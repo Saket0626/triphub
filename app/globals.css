@@ -78,15 +78,46 @@
       transition-colors hover:border-channel/50 has-[:checked]:border-channel has-[:checked]:ring-2 has-[:checked]:ring-channel/20;
   }
 
-  .hero-wash {
-    background:
-      radial-gradient(ellipse 70% 55% at 85% -10%, hsl(199 89% 44% / 0.1), transparent 58%),
-      radial-gradient(ellipse 45% 40% at 0% 0%, hsl(199 95% 94% / 0.85), transparent 52%);
+  .display-line {
+    @apply font-sans font-extrabold uppercase tracking-[-0.045em] text-soundings;
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+}
+
+@keyframes trust-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.trust-marquee-track {
+  animation: trust-marquee 48s linear infinite;
+}
+
+@keyframes photo-drift {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+
+.photo-drift {
+  animation: photo-drift 28s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trust-marquee-track,
+  .photo-drift {
+    animation: none;
   }
 }

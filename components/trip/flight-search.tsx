@@ -8,11 +8,13 @@ import type { FlightOption, TripBundle } from "@/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { minutesToDuration } from "@/lib/labels";
 import { pendingKey, setPending } from "@/lib/pending";
+import { compareFlightPoints } from "@/lib/loyalty";
 import { Badge } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Sheet, SheetContent } from "@/components/ui/dialog";
 import { SectionHeader } from "@/components/wizard/progress";
+import { PointsCompare } from "@/components/trip/points-compare";
 
 type SortKey = "best" | "price" | "duration" | "stops" | "departure" | "airline";
 
@@ -133,6 +135,7 @@ export function FlightSearch({ bundle }: { bundle: TripBundle }) {
               <button type="button" className="w-full text-left" onClick={() => setSelected(flight)}>
                 <FlightSummary flight={flight} travelers={bundle.trip.adultCount + bundle.trip.childCount} />
               </button>
+              <PointsCompare comparisons={compareFlightPoints(flight, bundle.loyaltyWallets ?? [])} />
             </CardContent>
           </Card>
         ))}

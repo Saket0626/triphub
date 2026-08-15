@@ -8,6 +8,7 @@ import { generateId } from "@/lib/utils";
 import type {
   ActivitySelection,
   Booking,
+  DestinationResearch,
   FlightOption,
   FlightSelection,
   GroundChoice,
@@ -16,6 +17,7 @@ import type {
   HotelOption,
   HotelPreferences,
   HotelSelection,
+  LoyaltyMembership,
   Trip,
   TripBundle,
   TripPreferences,
@@ -29,6 +31,12 @@ type FileStore = {
   travelers: Traveler[];
   preferences: TripPreferences[];
   hotelPreferences: HotelPreferences[];
+  loyaltyWallets: LoyaltyMembership[];
+  researchCache: Array<{
+    cacheKey: string;
+    payload: DestinationResearch;
+    expiresAt: string;
+  }>;
   flightSelections: FlightSelection[];
   hotelSelections: HotelSelection[];
   groundSelections: GroundSelection[];
@@ -41,6 +49,8 @@ const emptyStore = (): FileStore => ({
   travelers: [],
   preferences: [],
   hotelPreferences: [],
+  loyaltyWallets: [],
+  researchCache: [],
   flightSelections: [],
   hotelSelections: [],
   groundSelections: [],
@@ -113,6 +123,18 @@ function mapTravelerRow(row: Record<string, unknown>): Traveler {
   };
 }
 
+function mapWalletRow(row: Record<string, unknown>): LoyaltyMembership {
+  return {
+    id: row.id as string,
+    tripId: row.trip_id as string,
+    programId: row.program_id as string,
+    programLabel: row.program_label as string,
+    kind: (row.kind as LoyaltyMembership["kind"]) ?? "other",
+    memberNumber: (row.member_number as string) ?? null,
+    balance: Number(row.balance ?? 0),
+  };
+}
+
 function mapPrefsRow(row: Record<string, unknown>): TripPreferences {
   return {
     id: row.id as string,
@@ -138,6 +160,7 @@ async function assembleBundleFromLocal(store: FileStore, tripId: string): Promis
     travelers: store.travelers.filter((t) => t.tripId === tripId).sort((a, b) => a.sortOrder - b.sortOrder),
     preferences: store.preferences.find((p) => p.tripId === tripId) ?? null,
     hotelPreferences: store.hotelPreferences.find((p) => p.tripId === tripId) ?? null,
+    loyaltyWallets: store.loyaltyWallets.filter((w) => w.tripId === tripId),
     flightSelection: store.flightSelections.find((s) => s.tripId === tripId) ?? null,
     hotelSelection: store.hotelSelections.find((s) => s.tripId === tripId) ?? null,
     groundSelection: store.groundSelections.find((s) => s.tripId === tripId) ?? null,
@@ -199,6 +222,16 @@ export async function createTripFromIntake(input: IntakeConfirmInput): Promise<T
     specialAssistance: input.specialAssistance || null,
   };
 
+  const wallets: LoyaltyMembership[] = (input.loyaltyWallets ?? []).map((w) => ({
+    id: generateId(),
+    tripId,
+    programId: w.programId,
+    programLabel: w.programLabel,
+    kind: w.kind,
+    memberNumber: w.memberNumber || null,
+    balance: Math.max(0, Math.round(w.balance)),
+  }));
+
   const sb = serverSupabase();
   if (sb) {
     const { error: tripError } = await sb.from("trips").insert({
@@ -251,11 +284,29 @@ export async function createTripFromIntake(input: IntakeConfirmInput): Promise<T
       special_assistance: preferences.specialAssistance,
     });
     if (prefError) throw new Error(prefError.message);
+
+    if (wallets.length) {
+      const { error: walletError } = await sb.from("loyalty_wallets").insert(
+        wallets.map((w) => ({
+          id: w.id,
+          trip_id: w.tripId,
+          program_id: w.programId,
+          program_label: w.programLabel,
+          kind: w.kind,
+          member_number: w.memberNumber,
+          balance: w.balance,
+        }))
+      );
+      if (walletError && !/loyalty_wallets/i.test(walletError.message)) {
+        throw new Error(walletError.message);
+      }
+    }
   } else {
     const store = await readStore();
     store.trips.push(trip);
     store.travelers.push(...travelers);
     store.preferences.push(preferences);
+    store.loyaltyWallets.push(...wallets);
     await writeStore(store);
   }
 
@@ -264,6 +315,7 @@ export async function createTripFromIntake(input: IntakeConfirmInput): Promise<T
     travelers,
     preferences,
     hotelPreferences: null,
+    loyaltyWallets: wallets,
     flightSelection: null,
     hotelSelection: null,
     groundSelection: null,
@@ -283,6 +335,7 @@ export async function getTripBundle(tripId: string): Promise<TripBundle | null> 
       { data: travelerRows },
       { data: prefRow },
       { data: hotelPrefRow },
+      { data: walletRows },
       { data: flightRow },
       { data: hotelRow },
       { data: groundRow },
@@ -292,6 +345,7 @@ export async function getTripBundle(tripId: string): Promise<TripBundle | null> 
       sb.from("travelers").select("*").eq("trip_id", tripId).order("sort_order"),
       sb.from("trip_preferences").select("*").eq("trip_id", tripId).maybeSingle(),
       sb.from("hotel_preferences").select("*").eq("trip_id", tripId).maybeSingle(),
+      sb.from("loyalty_wallets").select("*").eq("trip_id", tripId),
       sb.from("flight_selections").select("*").eq("trip_id", tripId).maybeSingle(),
       sb.from("hotel_selections").select("*").eq("trip_id", tripId).maybeSingle(),
       sb.from("ground_selections").select("*").eq("trip_id", tripId).maybeSingle(),
@@ -314,6 +368,7 @@ export async function getTripBundle(tripId: string): Promise<TripBundle | null> 
             mustHaves: hotelPrefRow.must_haves ?? [],
           }
         : null,
+      loyaltyWallets: (walletRows ?? []).map(mapWalletRow),
       flightSelection: flightRow
         ? { id: flightRow.id, tripId: flightRow.trip_id, offer: flightRow.offer, confirmedAt: flightRow.confirmed_at }
         : null,
@@ -575,4 +630,52 @@ export async function createBooking(tripId: string, booking: Omit<Booking, "id">
 
 export function usingLocalStore() {
   return !isSupabaseConfigured();
+}
+
+export async function getCachedResearch(cacheKey: string): Promise<DestinationResearch | null> {
+  const now = Date.now();
+  const sb = serverSupabase();
+  if (sb) {
+    const { data, error } = await sb
+      .from("destination_research_cache")
+      .select("*")
+      .eq("cache_key", cacheKey)
+      .maybeSingle();
+    if (error || !data) return null;
+    if (new Date(data.expires_at).getTime() < now) return null;
+    return data.payload as DestinationResearch;
+  }
+  const store = await readStore();
+  const row = store.researchCache.find((r) => r.cacheKey === cacheKey);
+  if (!row || new Date(row.expiresAt).getTime() < now) return null;
+  return row.payload;
+}
+
+export async function saveCachedResearch(
+  trip: Trip,
+  cacheKey: string,
+  payload: DestinationResearch
+) {
+  const sb = serverSupabase();
+  if (sb) {
+    const { error: delError } = await sb.from("destination_research_cache").delete().eq("cache_key", cacheKey);
+    if (delError) return;
+    await sb.from("destination_research_cache").insert({
+      cache_key: cacheKey,
+      destination_code: trip.destinationCode,
+      destination_label: trip.destinationLabel,
+      departure_date: trip.departureDate,
+      return_date: trip.returnDate,
+      trip_purpose: trip.tripPurpose,
+      payload,
+      source: payload.source,
+      fetched_at: payload.fetchedAt,
+      expires_at: payload.expiresAt,
+    });
+    return;
+  }
+  const store = await readStore();
+  store.researchCache = store.researchCache.filter((r) => r.cacheKey !== cacheKey);
+  store.researchCache.push({ cacheKey, payload, expiresAt: payload.expiresAt });
+  await writeStore(store);
 }

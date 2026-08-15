@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const basics = tripBasicsSchema.parse(body);
     const travelers = travelersStepSchema.parse(body);
     const prefs = flightPreferencesSchema.parse(body);
-    const bundle = await createTripFromIntake({ ...basics, ...travelers, ...prefs });
+    const bundle = await createTripFromIntake({ ...basics, ...travelers, ...prefs, loyaltyWallets: travelers.loyaltyWallets ?? [] });
     return NextResponse.json({ id: bundle.trip.id, trip: bundle.trip });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Invalid trip data";

@@ -60,12 +60,21 @@ export const travelerSchema = z.object({
   loyaltyNumber: z.string().optional(),
 });
 
+export const loyaltyWalletSchema = z.object({
+  programId: z.string().min(1),
+  programLabel: z.string().min(1),
+  kind: z.enum(["airline", "hotel", "other"]),
+  memberNumber: z.string().optional(),
+  balance: z.number().min(0),
+});
+
 export const travelersStepSchema = z
   .object({
     contactEmail: z.string().email("Enter a valid email for itinerary updates"),
     adultCount: z.number().int().min(1, "At least one adult is required"),
     childCount: z.number().int().min(0).max(8),
     travelers: z.array(travelerSchema).min(1),
+    loyaltyWallets: z.array(loyaltyWalletSchema),
   })
   .superRefine((data, ctx) => {
     if (data.travelers.length !== data.adultCount + data.childCount) {
@@ -168,6 +177,7 @@ export const bookingConfirmSchema = z.object({
 
 export type TripBasicsInput = z.infer<typeof tripBasicsSchema>;
 export type TravelersStepInput = z.infer<typeof travelersStepSchema>;
+export type LoyaltyWalletInput = z.infer<typeof loyaltyWalletSchema>;
 export type FlightPreferencesInput = z.infer<typeof flightPreferencesSchema>;
 export type IntakeConfirmInput = z.infer<typeof intakeConfirmSchema>;
 export type HotelPreferencesInput = z.infer<typeof hotelPreferencesSchema>;

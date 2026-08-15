@@ -14,6 +14,7 @@ import {
 } from "@/lib/validation";
 import { airportLabel } from "@/lib/airports";
 import { AIRLINES, CABIN_NOTES, PURPOSE_LABELS, STOP_LABELS, TIME_WINDOWS, TRIP_TYPE_LABELS } from "@/lib/labels";
+import { LOYALTY_PROGRAMS, programById } from "@/lib/loyalty";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -57,6 +58,7 @@ export function IntakeWizard() {
     childCount: 0,
     contactEmail: "",
     travelers: emptyTravelers(1, 0),
+    loyaltyWallets: [],
   });
   const [prefs, setPrefs] = useState<Partial<FlightPreferencesInput>>({
     preferredAirlines: [],
@@ -324,12 +326,13 @@ function TravelersStep({
       adultCount: value.adultCount ?? 1,
       childCount: value.childCount ?? 0,
       travelers: value.travelers?.length ? value.travelers : emptyTravelers(1, 0),
+      loyaltyWallets: value.loyaltyWallets ?? [],
     },
   });
   const adults = form.watch("adultCount");
   const children = form.watch("childCount");
   const people = form.watch("travelers");
-  const [openLoyalty, setOpenLoyalty] = useState<Record<number, boolean>>({});
+  const wallets = form.watch("loyaltyWallets") ?? [];
 
   function resize(nextAdults: number, nextChildren: number) {
     const current = form.getValues("travelers") ?? [];
@@ -408,38 +411,116 @@ function TravelersStep({
                   </Field>
                 ) : null}
               </div>
-              <button
-                type="button"
-                className="text-sm text-primary"
-                onClick={() => setOpenLoyalty((s) => ({ ...s, [index]: !s[index] }))}
-              >
-                {openLoyalty[index] ? "Hide" : "Add"} frequent flyer / loyalty numbers
-              </button>
-              {openLoyalty[index] ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Input
-                    placeholder="Program (e.g. SkyMiles)"
-                    value={person.loyaltyProgram ?? ""}
-                    onChange={(e) => {
-                      const next = [...people];
-                      next[index] = { ...next[index], loyaltyProgram: e.target.value };
-                      form.setValue("travelers", next);
-                    }}
-                  />
-                  <Input
-                    placeholder="Membership number"
-                    value={person.loyaltyNumber ?? ""}
-                    onChange={(e) => {
-                      const next = [...people];
-                      next[index] = { ...next[index], loyaltyNumber: e.target.value };
-                      form.setValue("travelers", next);
-                    }}
-                  />
-                </div>
-              ) : null}
             </CardContent>
           </Card>
         ))}
+        <div className="rounded-2xl border border-border p-5">
+          <p className="font-medium">Loyalty wallet</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            We don&apos;t have live access to your accounts. Enter what you currently have and we&apos;ll help you
+            decide when to use it. Nothing gets spent automatically.
+          </p>
+          <div className="mt-4 space-y-4">
+            {wallets.map((wallet, index) => (
+              <div key={`${wallet.programId}-${index}`} className="grid gap-3 rounded-xl border border-border p-3 sm:grid-cols-2">
+                <Field label="Program">
+                  <select
+                    className="h-11 w-full rounded-xl border bg-white px-3 text-sm"
+                    value={wallet.programId}
+                    onChange={(e) => {
+                      const program = programById(e.target.value);
+                      const next = [...wallets];
+                      next[index] = {
+                        ...next[index],
+                        programId: program.id,
+                        programLabel: program.id === "other" ? next[index].programLabel : program.label,
+                        kind: program.kind,
+                      };
+                      form.setValue("loyaltyWallets", next);
+                    }}
+                  >
+                    {LOYALTY_PROGRAMS.map((program) => (
+                      <option key={program.id} value={program.id}>
+                        {program.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                {wallet.programId === "other" ? (
+                  <Field label="Program name">
+                    <Input
+                      value={wallet.programLabel}
+                      onChange={(e) => {
+                        const next = [...wallets];
+                        next[index] = { ...next[index], programLabel: e.target.value };
+                        form.setValue("loyaltyWallets", next);
+                      }}
+                    />
+                  </Field>
+                ) : (
+                  <Field label="Member number (optional)">
+                    <Input
+                      value={wallet.memberNumber ?? ""}
+                      onChange={(e) => {
+                        const next = [...wallets];
+                        next[index] = { ...next[index], memberNumber: e.target.value };
+                        form.setValue("loyaltyWallets", next);
+                      }}
+                    />
+                  </Field>
+                )}
+                {wallet.programId === "other" ? (
+                  <Field label="Member number (optional)">
+                    <Input
+                      value={wallet.memberNumber ?? ""}
+                      onChange={(e) => {
+                        const next = [...wallets];
+                        next[index] = { ...next[index], memberNumber: e.target.value };
+                        form.setValue("loyaltyWallets", next);
+                      }}
+                    />
+                  </Field>
+                ) : null}
+                <Field label="Current points / miles">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={wallet.balance || ""}
+                    onChange={(e) => {
+                      const next = [...wallets];
+                      next[index] = { ...next[index], balance: Number(e.target.value) || 0 };
+                      form.setValue("loyaltyWallets", next);
+                    }}
+                  />
+                </Field>
+                <div className="flex items-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => form.setValue("loyaltyWallets", wallets.filter((_, i) => i !== index))}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-4"
+            onClick={() => {
+              const delta = programById("delta_skymiles");
+              form.setValue("loyaltyWallets", [
+                ...wallets,
+                { programId: delta.id, programLabel: delta.label, kind: delta.kind, memberNumber: "", balance: 0 },
+              ]);
+            }}
+          >
+            Add a program
+          </Button>
+        </div>
         {form.formState.errors.travelers?.message ? (
           <p className="text-sm text-destructive">{form.formState.errors.travelers.message}</p>
         ) : null}
@@ -672,6 +753,10 @@ function ReviewStep({
           ...(travelers.travelers ?? []).map((t) => [
             t.fullName || "(name needed)",
             `${t.type}${t.dateOfBirth ? ` · born ${formatDate(t.dateOfBirth)}` : ""}`,
+          ]),
+          ...(travelers.loyaltyWallets ?? []).map((w) => [
+            w.programLabel,
+            `${(w.balance ?? 0).toLocaleString()} pts${w.memberNumber ? ` · ${w.memberNumber}` : ""}`,
           ]),
         ],
       },

@@ -1,6 +1,36 @@
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
+const U = (id: string, w = 2400) =>
+  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=90`;
+
+export const LANDING_PHOTOS = {
+  hero: {
+    src: U("photo-1534430480872-3498386e7856"),
+    alt: "Empire State Building over Manhattan at dusk",
+  },
+  research: {
+    src: U("photo-1555881400-74d7acaacd8b"),
+    alt: "Lisbon tram on a steep European street",
+  },
+  flights: {
+    src: U("photo-1464037866556-6812c9d1c72e"),
+    alt: "Window-seat view of clouds at sunrise",
+  },
+  hotels: {
+    src: U("photo-1551882547-ff40c63fe5fa"),
+    alt: "European hotel at evening",
+  },
+  activities: {
+    src: U("photo-1523906834658-6e24ef2386f9"),
+    alt: "Venice canal in late afternoon light",
+  },
+  points: {
+    src: U("photo-1485871981521-5b1fd3805eee"),
+    alt: "New York at night from the river",
+  },
+} as const;
+
 export const PHOTOS = {
   hero: {
     src: "https://images.unsplash.com/photo-1516483638261-f4dbaf036963?auto=format&fit=crop&w=1800&q=80",
@@ -43,6 +73,8 @@ export function TravelPhoto({
   sizes = "(max-width: 768px) 100vw, 50vw",
   priority = false,
   caption,
+  drift = false,
+  objectPosition,
 }: {
   src: string;
   alt: string;
@@ -50,6 +82,8 @@ export function TravelPhoto({
   sizes?: string;
   priority?: boolean;
   caption?: string;
+  drift?: boolean;
+  objectPosition?: string;
 }) {
   return (
     <div className={cn("group relative overflow-hidden bg-secondary", className)}>
@@ -59,7 +93,18 @@ export function TravelPhoto({
         fill
         sizes={sizes}
         priority={priority}
-        className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+        quality={90}
+        style={
+          objectPosition
+            ? { objectPosition, transformOrigin: objectPosition }
+            : undefined
+        }
+        className={cn(
+          "object-cover will-change-transform",
+          drift
+            ? "photo-drift"
+            : "transition-transform duration-1000 ease-out group-hover:scale-[1.06]"
+        )}
       />
       {caption ? (
         <span className="absolute bottom-3 left-3 rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-soundings shadow-sm backdrop-blur-sm">
