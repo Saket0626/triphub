@@ -94,6 +94,7 @@ export interface PlaceSnapshot {
   hoursSummary?: string;
   openNow?: boolean | null;
   businessStatus?: string;
+  source?: "mock" | "geoapify";
 }
 
 export interface TripPreferences {

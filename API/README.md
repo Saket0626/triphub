@@ -10,7 +10,7 @@ Copy `API/env.template` → `.env.local` (local) and into Railway Variables (dep
 | Duffel | Live flight search + order creation | `DUFFEL_API_KEY` | [DUFFEL.md](./DUFFEL.md) |
 | LiteAPI / Nuitee | Live hotel search (Amadeus replacement) | `LITEAPI_KEY` | [LITEAPI.md](./LITEAPI.md) |
 | Viator | Live tours/activities (partner approval) | `VIATOR_API_KEY` | [VIATOR.md](./VIATOR.md) |
-| Google Places (New) | Ratings, hours, place still exists | `GOOGLE_PLACES_API_KEY` | [PLACES.md](./PLACES.md) |
+| Geoapify | Hours + whether a place still maps (no Google billing) | `GEOAPIFY_API_KEY` | [PLACES.md](./PLACES.md) |
 | Anthropic | Destination research with web search | `ANTHROPIC_API_KEY` | [ANTHROPIC.md](./ANTHROPIC.md) |
 | Loyalty valuations | Cash vs points comparison (no live API) | — | [LOYALTY.md](./LOYALTY.md) |
 | Hotelbeds | Alternate hotel inventory (unused) | `HOTELBEDS_API_KEY`, `HOTELBEDS_API_SECRET` | [HOTELBEDS.md](./HOTELBEDS.md) |

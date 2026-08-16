@@ -64,19 +64,22 @@ export function PlaceMeta({
   ratingCount,
   hoursSummary,
   businessStatus,
+  source,
 }: {
   rating?: number;
   ratingCount?: number;
   hoursSummary?: string;
   businessStatus?: string;
+  source?: "mock" | "geoapify";
 }) {
   if (!rating && !hoursSummary) return null;
   return (
     <p className="text-xs text-muted-foreground">
-      {rating ? `${rating.toFixed(1)} Google rating` : null}
+      {rating ? `${rating.toFixed(1)} rating` : null}
       {rating && ratingCount ? ` (${ratingCount})` : null}
       {hoursSummary ? ` · ${hoursSummary}` : null}
       {businessStatus && businessStatus !== "OPERATIONAL" ? ` · ${businessStatus}` : null}
+      {source === "geoapify" ? " · Geoapify" : null}
     </p>
   );
 }

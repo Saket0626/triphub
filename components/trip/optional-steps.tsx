@@ -185,6 +185,7 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
                     ratingCount={activity.place?.ratingCount ?? activity.reviewCount}
                     hoursSummary={activity.place?.hoursSummary}
                     businessStatus={activity.place?.businessStatus}
+                    source={activity.place?.source}
                   />
                 </div>
                 <div className="shrink-0 text-right">

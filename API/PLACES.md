@@ -1,21 +1,18 @@
-# Google Places API (New)
+# Geoapify (Google Places replacement)
 
-On-the-ground detail for hotels and activities: ratings, current hours, whether the place is still operating.
+On-the-ground detail for hotels and activities: whether the place still maps, OSM opening hours when tagged. **No credit card.** Free plan is 3,000 credits/day and allows commercial use with attribution.
 
-**Enable the API:** https://console.cloud.google.com/apis/library/places.googleapis.com  
-**Create a key:** https://console.cloud.google.com/google/maps-apis/credentials  
-**Docs:** https://developers.google.com/maps/documentation/places/web-service/text-search  
-**Env:** `GOOGLE_PLACES_API_KEY`
+**Sign up (free):** https://www.geoapify.com/  
+**Keys:** https://myprojects.geoapify.com/  
+**Geocoding docs:** https://apidocs.geoapify.com/docs/geocoding/forward-geocoding/  
+**Env:** `GEOAPIFY_API_KEY`
 
-Billing must be enabled on the Google Cloud project. Places has a monthly free quota, then per-request charges.
+Do not enable Google Cloud billing. Geoapify is OSM-based, so you get hours and existence — not Google star ratings. Hotel/activity ratings still come from LiteAPI and Viator.
 
 ## What we call
 
-`POST https://places.googleapis.com/v1/places:searchText`
-
-Headers:
-
-- `X-Goog-Api-Key`
-- `X-Goog-FieldMask: places.id,places.displayName,places.rating,places.userRatingCount,places.businessStatus,places.currentOpeningHours,places.regularOpeningHours`
+`GET https://api.geoapify.com/v1/geocode/search?text=…&limit=1&format=json&apiKey=…`
 
 Code: `lib/places.ts`. Mock snapshots while `SANDBOX_MODE=true` or the key is missing.
+
+Free-plan attribution: “Powered by Geoapify” (and OpenStreetMap) wherever this data is shown.

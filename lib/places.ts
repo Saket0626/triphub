@@ -1,17 +1,18 @@
 /**
- * Google Places API (New) — ratings, hours, whether a place still exists.
- * Docs: https://developers.google.com/maps/documentation/places/web-service/text-search
- * POST https://places.googleapis.com/v1/places:searchText
- * Headers: X-Goog-Api-Key, X-Goog-FieldMask
+ * Geoapify Places / Geocoding — hours, whether a place still maps, OSM tags.
+ * Free plan: 3,000 credits/day, no credit card.
+ * Docs: https://apidocs.geoapify.com/docs/geocoding/forward-geocoding/
+ * Place details: https://apidocs.geoapify.com/docs/place-details/
  *
- * SANDBOX_MODE=true or missing GOOGLE_PLACES_API_KEY → mock snapshots.
+ * SANDBOX_MODE=true or missing GEOAPIFY_API_KEY → mock snapshots.
+ * Google Places is not used (billing account required).
  */
 
 import { env, isPlaceholder } from "@/lib/env";
 import type { PlaceSnapshot } from "@/types";
 
 export function isPlacesConfigured() {
-  const key = env.googlePlacesApiKey;
+  const key = env.geoapifyApiKey;
   return Boolean(key) && key.length > 12 && !isPlaceholder(key) && !key.startsWith("your_");
 }
 
@@ -19,25 +20,23 @@ export function isLivePlaces() {
   return !env.sandboxMode && isPlacesConfigured();
 }
 
-type PlaceRow = {
-  id?: string;
-  rating?: number;
-  userRatingCount?: number;
-  businessStatus?: string;
-  currentOpeningHours?: { openNow?: boolean; weekdayDescriptions?: string[] };
-  regularOpeningHours?: { openNow?: boolean; weekdayDescriptions?: string[] };
+type GeoapifyHit = {
+  place_id?: string;
+  name?: string;
+  formatted?: string;
+  result_type?: string;
+  datasource?: { raw?: Record<string, unknown> };
 };
 
-function snapshotFromPlace(place: PlaceRow | undefined, fallbackRating?: number): PlaceSnapshot {
-  const hours = place?.currentOpeningHours ?? place?.regularOpeningHours;
-  return {
-    placeId: place?.id,
-    rating: place?.rating ?? fallbackRating,
-    ratingCount: place?.userRatingCount,
-    openNow: hours?.openNow ?? null,
-    hoursSummary: hours?.weekdayDescriptions?.[0],
-    businessStatus: place?.businessStatus ?? "OPERATIONAL",
-  };
+function hoursFromRaw(raw?: Record<string, unknown>): string | undefined {
+  const hours = raw?.opening_hours;
+  return typeof hours === "string" && hours.trim() ? hours.trim() : undefined;
+}
+
+function statusFromRaw(raw?: Record<string, unknown>): string {
+  if (!raw) return "OPERATIONAL";
+  if (raw.disused || raw.abandoned || raw.razed) return "CLOSED";
+  return "OPERATIONAL";
 }
 
 export function mockPlaceSnapshot(name: string, seedRating = 4.6): PlaceSnapshot {
@@ -48,42 +47,49 @@ export function mockPlaceSnapshot(name: string, seedRating = 4.6): PlaceSnapshot
     openNow: open,
     hoursSummary: open ? "Open · typical hours 8 AM–10 PM" : "Hours vary",
     businessStatus: "OPERATIONAL",
+    source: "mock",
   };
 }
-
-const FIELD_MASK = [
-  "places.id",
-  "places.displayName",
-  "places.rating",
-  "places.userRatingCount",
-  "places.businessStatus",
-  "places.currentOpeningHours",
-  "places.regularOpeningHours",
-].join(",");
 
 export async function lookupPlace(query: string, fallbackRating?: number): Promise<PlaceSnapshot> {
   if (!isLivePlaces()) {
     return mockPlaceSnapshot(query, fallbackRating);
   }
 
-  const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": env.googlePlacesApiKey,
-      "X-Goog-FieldMask": FIELD_MASK,
-    },
-    body: JSON.stringify({
-      textQuery: query,
-      maxResultCount: 1,
-      languageCode: "en",
-    }),
+  const url = new URL("https://api.geoapify.com/v1/geocode/search");
+  url.searchParams.set("text", query);
+  url.searchParams.set("limit", "1");
+  url.searchParams.set("format", "json");
+  url.searchParams.set("apiKey", env.geoapifyApiKey);
+
+  const res = await fetch(url.toString(), {
+    headers: { Accept: "application/json" },
   });
   if (!res.ok) {
     return mockPlaceSnapshot(query, fallbackRating);
   }
-  const json = (await res.json()) as { places?: PlaceRow[] };
-  return snapshotFromPlace(json.places?.[0], fallbackRating);
+
+  const json = (await res.json()) as { results?: GeoapifyHit[] };
+  const hit = json.results?.[0];
+  if (!hit) {
+    return {
+      rating: fallbackRating,
+      businessStatus: "UNKNOWN",
+      hoursSummary: undefined,
+      openNow: null,
+      source: "geoapify",
+    };
+  }
+
+  const raw = hit.datasource?.raw;
+  return {
+    placeId: hit.place_id,
+    rating: fallbackRating,
+    hoursSummary: hoursFromRaw(raw),
+    openNow: null,
+    businessStatus: statusFromRaw(raw),
+    source: "geoapify",
+  };
 }
 
 export async function enrichPlaces(queries: string[]): Promise<PlaceSnapshot[]> {
