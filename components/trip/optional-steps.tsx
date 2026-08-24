@@ -162,6 +162,11 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
         description="A few ideas for the destination. Skip anything. Nothing gets added until you confirm."
       />
       {sandbox ? <SandboxNote inventory="tours" research="destination" /> : null}
+      {suggestions.length === 0 ? (
+        <p className="mb-6 rounded-2xl border border-dashed border-black/10 px-5 py-8 text-sm text-muted-foreground">
+          No tours came back for those dates. You can skip this step and keep going.
+        </p>
+      ) : null}
       <div className="grid gap-3">
         {suggestions.map((activity) => (
           <div key={activity.id}>

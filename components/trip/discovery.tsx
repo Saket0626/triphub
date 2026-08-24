@@ -72,14 +72,13 @@ export function PlaceMeta({
   businessStatus?: string;
   source?: "mock" | "geoapify";
 }) {
-  if (!rating && !hoursSummary) return null;
-  return (
-    <p className="text-xs text-muted-foreground">
-      {rating ? `${rating.toFixed(1)} rating` : null}
-      {rating && ratingCount ? ` (${ratingCount})` : null}
-      {hoursSummary ? ` · ${hoursSummary}` : null}
-      {businessStatus && businessStatus !== "OPERATIONAL" ? ` · ${businessStatus}` : null}
-      {source === "geoapify" ? " · Geoapify" : null}
-    </p>
-  );
+  if (!rating && !hoursSummary && source !== "geoapify") return null;
+  const bits = [
+    rating ? `${rating.toFixed(1)} rating${ratingCount ? ` (${ratingCount})` : ""}` : null,
+    hoursSummary || null,
+    businessStatus && businessStatus !== "OPERATIONAL" ? businessStatus : null,
+    source === "geoapify" ? "Powered by Geoapify" : null,
+  ].filter(Boolean);
+  if (!bits.length) return null;
+  return <p className="text-xs text-muted-foreground">{bits.join(" · ")}</p>;
 }

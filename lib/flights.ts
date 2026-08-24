@@ -84,6 +84,13 @@ async function searchDuffel(trip: Trip, prefs: TripPreferences): Promise<FlightO
   return offers.slice(0, 12).map((offer) => mapDuffelOffer(offer, prefs, trip));
 }
 
+function isoDurationMinutes(iso: unknown) {
+  if (typeof iso !== "string") return 0;
+  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/i);
+  if (!match) return 0;
+  return Number(match[1] || 0) * 60 + Number(match[2] || 0) + Math.round(Number(match[3] || 0) / 60);
+}
+
 function mapDuffelOffer(
   offer: Record<string, unknown>,
   prefs: TripPreferences,
@@ -106,7 +113,7 @@ function mapDuffelOffer(
     to: trip.destinationCode,
     departAt: String(first.departing_at ?? `${trip.departureDate}T08:00:00`),
     arriveAt: String(last.arriving_at ?? `${trip.departureDate}T12:00:00`),
-    durationMinutes: 180,
+    durationMinutes: isoDurationMinutes(slices[0]?.duration) || isoDurationMinutes(offer.total_duration) || 180,
     stops: Math.max(0, outbound.length - 1),
     layovers: [],
     segments: outbound.map((seg) => ({

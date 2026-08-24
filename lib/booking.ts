@@ -2,7 +2,7 @@
 
 import { createBooking, getTripBundle } from "@/lib/db";
 import { sendConfirmationEmail } from "@/lib/email";
-import { env } from "@/lib/env";
+import { isTestBooking } from "@/lib/env";
 import { generateConfirmationNumber } from "@/lib/utils";
 import type { ItinerarySnapshot } from "@/types";
 
@@ -40,7 +40,7 @@ export async function finalizeTripBooking(tripId: string, stripeSessionId?: stri
     confirmationNumber: generateConfirmationNumber(),
     totalPrice,
     currency: "USD",
-    sandbox: env.sandboxMode,
+    sandbox: isTestBooking(),
     itinerarySnapshot,
     createdAt: new Date().toISOString(),
   });

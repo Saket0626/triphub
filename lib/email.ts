@@ -22,8 +22,8 @@ export async function sendConfirmationEmail(booking: Booking, to: string) {
   const { data, error } = await resend.emails.send({
     from: env.emailFrom,
     to,
-    subject: env.sandboxMode
-      ? `[Sandbox] Your TripHub confirmation ${booking.confirmationNumber}`
+    subject: booking.sandbox
+      ? `[Test] Your TripHub confirmation ${booking.confirmationNumber}`
       : `Your TripHub confirmation ${booking.confirmationNumber}`,
     html,
   });

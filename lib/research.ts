@@ -81,57 +81,63 @@ export async function runDestinationResearch(trip: Trip): Promise<DestinationRes
   const dates = `${trip.departureDate} to ${trip.returnDate ?? trip.departureDate}`;
   const purpose = trip.tripPurpose ?? "vacation";
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": env.anthropicApiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 2048,
-      tools: [
-        {
-          type: "web_search_20250305",
-          name: "web_search",
-          max_uses: 4,
-        },
-      ],
-      system:
-        "You research a specific trip. Use web search. Every specific claim (a date, a price, a 'currently running' deal) MUST include a sourceUrl the traveler can open. Return ONLY JSON with keys deals, events, localFavorites. Each item: title, summary, sourceUrl, sourceName, relatedNames (hotel or tour names if any), kind (hotel|activity|general). No markdown.",
-      messages: [
-        {
-          role: "user",
-          content: `Research ${city} (${trip.destinationCode}) for a ${purpose} trip ${dates}, party of ${trip.adultCount + trip.childCount}. Find: (1) currently-running hotel or activity deals/promos, (2) seasonal events during those exact dates, (3) 2–3 local-favorite hotels or experiences a ranked API might bury. If you cannot verify something with a URL, omit it.`,
-        },
-      ],
-    }),
-  });
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": env.anthropicApiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      signal: AbortSignal.timeout(25_000),
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 2048,
+        tools: [
+          {
+            type: "web_search_20250305",
+            name: "web_search",
+            max_uses: 4,
+          },
+        ],
+        system:
+          "You research a specific trip. Use web search. Every specific claim (a date, a price, a 'currently running' deal) MUST include a sourceUrl the traveler can open. Return ONLY JSON with keys deals, events, localFavorites. Each item: title, summary, sourceUrl, sourceName, relatedNames (hotel or tour names if any), kind (hotel|activity|general). No markdown.",
+        messages: [
+          {
+            role: "user",
+            content: `Research ${city} (${trip.destinationCode}) for a ${purpose} trip ${dates}, party of ${trip.adultCount + trip.childCount}. Find: (1) currently-running hotel or activity deals/promos, (2) seasonal events during those exact dates, (3) 2–3 local-favorite hotels or experiences a ranked API might bury. If you cannot verify something with a URL, omit it.`,
+          },
+        ],
+      }),
+    });
 
-  if (!res.ok) {
+    if (!res.ok) {
+      return mockDestinationResearch(trip);
+    }
+
+    const json = (await res.json()) as { content?: AnthropicBlock[] };
+    const text = (json.content ?? [])
+      .filter((b) => b.type === "text" && b.text)
+      .map((b) => b.text)
+      .join("\n");
+    const parsed = extractJsonObject(text);
+    const fetchedAt = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    if (!parsed) {
+      return mockDestinationResearch(trip);
+    }
+
+    return {
+      source: "anthropic",
+      fetchedAt,
+      expiresAt,
+      deals: parseFindings(parsed.deals, "hotel"),
+      events: parseFindings(parsed.events, "general"),
+      localFavorites: parseFindings(parsed.localFavorites, "activity"),
+    };
+  } catch (error) {
+    console.error("Destination research failed", error);
     return mockDestinationResearch(trip);
   }
-
-  const json = (await res.json()) as { content?: AnthropicBlock[] };
-  const text = (json.content ?? [])
-    .filter((b) => b.type === "text" && b.text)
-    .map((b) => b.text)
-    .join("\n");
-  const parsed = extractJsonObject(text);
-  const fetchedAt = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-
-  if (!parsed) {
-    return mockDestinationResearch(trip);
-  }
-
-  return {
-    source: "anthropic",
-    fetchedAt,
-    expiresAt,
-    deals: parseFindings(parsed.deals, "hotel"),
-    events: parseFindings(parsed.events, "general"),
-    localFavorites: parseFindings(parsed.localFavorites, "activity"),
-  };
 }

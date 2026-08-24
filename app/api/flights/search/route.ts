@@ -6,6 +6,7 @@ import { getTripBundle } from "@/lib/db";
 import { searchFlights } from "@/lib/flights";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const bodySchema = z.object({ tripId: z.string().min(1) });
 

@@ -192,6 +192,11 @@ function HotelResults({ bundle }: { bundle: TripBundle }) {
       />
       {sandbox ? <SandboxNote inventory="stays" research="destination" /> : null}
       <div className="grid gap-5">
+        {hotels.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-black/10 px-5 py-8 text-sm text-muted-foreground">
+            No stays came back for those dates. Try different dates or a nearby city.
+          </p>
+        ) : null}
         {hotels.map((hotel, i) => (
           <Card key={hotel.id} className="overflow-hidden">
             <button type="button" className="grid w-full gap-0 text-left sm:grid-cols-[220px_1fr]" onClick={() => setSelected(hotel)}>

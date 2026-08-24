@@ -6,6 +6,7 @@ import { getCachedResearch, getTripBundle, saveCachedResearch } from "@/lib/db";
 import { researchCacheKey, runDestinationResearch } from "@/lib/research";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const bodySchema = z.object({ tripId: z.string().min(1) });
 

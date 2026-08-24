@@ -208,18 +208,23 @@ async function lookupDestinationId(city: string): Promise<string | null> {
   const res = await fetch(`${VIATOR_BASE}/search/freetext`, {
     method: "POST",
     headers: await viatorHeaders(),
+    signal: AbortSignal.timeout(10_000),
     body: JSON.stringify({
       searchTerm: city,
-      searchTypes: ["DESTINATIONS"],
-      pagination: { start: 1, count: 5 },
+      searchTypes: [{ searchType: "DESTINATIONS", pagination: { start: 1, count: 5 } }],
       currency: "USD",
     }),
   });
   if (!res.ok) return null;
   const json = (await res.json()) as {
-    destinations?: Array<{ destinationId?: number | string; id?: number | string }>;
+    destinations?:
+      | Array<{ destinationId?: number | string; id?: number | string }>
+      | { results?: Array<{ destinationId?: number | string; id?: number | string }> };
   };
-  const first = json.destinations?.[0];
+  const rows = Array.isArray(json.destinations)
+    ? json.destinations
+    : json.destinations?.results ?? [];
+  const first = rows[0];
   const id = first?.destinationId ?? first?.id;
   return id != null ? String(id) : null;
 }
@@ -230,32 +235,39 @@ export async function searchViatorActivities(trip: Trip): Promise<ActivityOption
     return mockViatorProducts(trip).map((p) => mapViatorProduct(p, people));
   }
 
-  const city = cityName(trip.destinationLabel);
-  const destinationId = await lookupDestinationId(city);
-  const body: Record<string, unknown> = {
-    filtering: {
-      startDate: trip.departureDate,
-      endDate: trip.returnDate ?? trip.departureDate,
-      ...(destinationId ? { destination: destinationId } : {}),
-    },
-    sorting: { sort: "TRAVELER_RATING", order: "DESCENDING" },
-    pagination: { start: 1, count: 12 },
-    currency: "USD",
-  };
+  try {
+    const city = cityName(trip.destinationLabel);
+    const destinationId = await lookupDestinationId(city);
+    const body: Record<string, unknown> = {
+      filtering: {
+        startDate: trip.departureDate,
+        endDate: trip.returnDate ?? trip.departureDate,
+        ...(destinationId ? { destination: destinationId } : {}),
+      },
+      sorting: { sort: "TRAVELER_RATING", order: "DESCENDING" },
+      pagination: { start: 1, count: 12 },
+      currency: "USD",
+    };
 
-  const res = await fetch(`${VIATOR_BASE}/products/search`, {
-    method: "POST",
-    headers: await viatorHeaders(),
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Viator search failed (${res.status}): ${text.slice(0, 240)}`);
-  }
-  const json = (await res.json()) as { products?: ViatorProduct[] };
-  const products = json.products ?? [];
-  if (!products.length) {
+    const res = await fetch(`${VIATOR_BASE}/products/search`, {
+      method: "POST",
+      headers: await viatorHeaders(),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`Viator search failed (${res.status}): ${text.slice(0, 240)}`);
+      return mockViatorProducts(trip).map((p) => mapViatorProduct(p, people));
+    }
+    const json = (await res.json()) as { products?: ViatorProduct[] };
+    const products = json.products ?? [];
+    if (!products.length) {
+      return mockViatorProducts(trip).map((p) => mapViatorProduct(p, people));
+    }
+    return products.slice(0, 12).map((p) => mapViatorProduct(p, people));
+  } catch (error) {
+    console.error("Viator search failed", error);
     return mockViatorProducts(trip).map((p) => mapViatorProduct(p, people));
   }
-  return products.slice(0, 12).map((p) => mapViatorProduct(p, people));
 }

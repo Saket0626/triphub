@@ -4,7 +4,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { finalizeTripBooking } from "@/lib/booking";
 import { getTripBundle } from "@/lib/db";
-import { env } from "@/lib/env";
 import { getStripe, isStripeConfigured } from "@/lib/stripe";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -45,8 +44,8 @@ export default async function ConfirmationPage({
         Confirmation <span className="font-medium text-foreground">{booking.confirmationNumber}</span>
       </p>
       <p className="mt-2 text-sm text-muted-foreground">
-        {env.sandboxMode
-          ? "Test payment captured in the TripHub Stripe sandbox. A confirmation email was prepared (sent live only if Resend is configured)."
+        {booking.sandbox
+          ? `Test booking saved. No airline or hotel tickets were issued. A confirmation email is on its way to ${bundle.trip.contactEmail}.`
           : `A confirmation email is on its way to ${bundle.trip.contactEmail}.`}
       </p>
       <Card className="mx-auto mt-10 max-w-xl text-left">

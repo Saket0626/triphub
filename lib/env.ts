@@ -48,3 +48,16 @@ export function isSupabaseConfigured() {
 export function isResendConfigured() {
   return env.resendApiKey.startsWith("re_") && !isPlaceholder(env.resendApiKey);
 }
+
+export function isTestStripeKey() {
+  return /^(sk_test_|rk_test_|rkcs_test_)/.test(env.stripeSecretKey);
+}
+
+/** TripHub does not create Duffel/LiteAPI orders yet — Stripe capture is not a ticket. */
+export function isSupplierTicketingEnabled() {
+  return false;
+}
+
+export function isTestBooking() {
+  return env.sandboxMode || !isSupplierTicketingEnabled() || isTestStripeKey();
+}

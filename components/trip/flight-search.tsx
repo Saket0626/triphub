@@ -123,6 +123,11 @@ export function FlightSearch({ bundle }: { bundle: TripBundle }) {
         </select>
       </div>
       <div className="grid gap-4">
+        {visible.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-black/10 px-5 py-8 text-sm text-muted-foreground">
+            No flights came back for those dates and airports. Go back and try different dates, or a nearby airport.
+          </p>
+        ) : null}
         {visible.map((flight, i) => (
           <Card key={flight.id} className={i === 0 && sort === "best" ? "ring-1 ring-primary/30" : ""}>
             <CardContent className="pt-6">

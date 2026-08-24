@@ -8,11 +8,11 @@ Activities/tours inventory. **Not self-serve.** Tripadvisor has to approve a par
 
 ## What we call
 
-- `POST https://api.viator.com/partner/search/freetext` — destination lookup (`searchTypes: ["DESTINATIONS"]`)
-- `POST https://api.viator.com/partner/products/search` — bookable product summaries
+- `POST {VIATOR_API_BASE}/search/freetext` — destination lookup (`searchTypes: [{ searchType: "DESTINATIONS", pagination }]`)
+- `POST {VIATOR_API_BASE}/products/search` — bookable product summaries
 - Header: `exp-api-key`
 - `Accept: application/json;version=2.0`
 
 Code: `lib/viator.ts`, used from `lib/activities.ts` when `SANDBOX_MODE=false` and the key is real.
 
-Optional: `VIATOR_API_BASE` if they give you a sandbox host instead of `https://api.viator.com/partner`.
+Optional: `VIATOR_API_BASE`. Pre-production keys use `https://api.sandbox.viator.com/partner`; live keys use `https://api.viator.com/partner`.
