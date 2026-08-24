@@ -81,7 +81,27 @@ async function searchDuffel(trip: Trip, prefs: TripPreferences): Promise<FlightO
     data?: { offers?: Array<Record<string, unknown>> };
   };
   const offers = json.data?.offers ?? [];
-  return offers.slice(0, 24).map((offer) => mapDuffelOffer(offer, prefs, trip));
+  const mapped = offers
+    .map((offer) => mapDuffelOffer(offer, prefs, trip))
+    .filter((flight) => {
+      const airline = flight.airline.toLowerCase();
+      const code = flight.airlineCode.toUpperCase();
+      if (airline.includes("duffel") || code === "ZZ") return false;
+      if (!flight.flightNumber) return false;
+      if (flight.from && flight.from !== trip.departureCode) return false;
+      if (flight.to && flight.to !== trip.destinationCode) return false;
+      return true;
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 24);
+  if (!mapped.length) {
+    throw new Error("Duffel did not return real airline offers for this route. Try different dates or nearby airports.");
+  }
+  return mapped;
+}
+
+function rec(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 function isoDurationMinutes(iso: unknown) {
@@ -91,52 +111,128 @@ function isoDurationMinutes(iso: unknown) {
   return Number(match[1] || 0) * 60 + Number(match[2] || 0) + Math.round(Number(match[3] || 0) / 60);
 }
 
+function mapSlice(slice: Record<string, unknown>, owner: Record<string, unknown>, fallbackFrom: string, fallbackTo: string, fallbackDate: string) {
+  const segmentsRaw = (slice.segments as Array<Record<string, unknown>> | undefined) ?? [];
+  const first = segmentsRaw[0] ?? {};
+  const last = segmentsRaw[segmentsRaw.length - 1] ?? first;
+  const marketing = rec(first.marketing_carrier);
+  const operating = rec(first.operating_carrier);
+  const flightNumber = String(
+    first.marketing_carrier_flight_number ??
+      first.operating_carrier_flight_number ??
+      marketing.iata_code ??
+      ""
+  );
+  const layovers = segmentsRaw.slice(0, -1).map((seg, i) => {
+    const next = segmentsRaw[i + 1] ?? {};
+    const arrive = Date.parse(String(seg.arriving_at ?? ""));
+    const leave = Date.parse(String(next.departing_at ?? ""));
+    return {
+      airport: String(rec(seg.destination).iata_code ?? ""),
+      durationMinutes: Number.isFinite(arrive) && Number.isFinite(leave) ? Math.max(0, Math.round((leave - arrive) / 60000)) : 0,
+    };
+  });
+  const durationMinutes = isoDurationMinutes(slice.duration) || 180;
+  return {
+    airline: String(operating.name ?? marketing.name ?? owner.name ?? "Airline"),
+    airlineCode: String(operating.iata_code ?? marketing.iata_code ?? owner.iata_code ?? ""),
+    flightNumber,
+    from: String(rec(first.origin).iata_code ?? fallbackFrom),
+    to: String(rec(last.destination).iata_code ?? fallbackTo),
+    departAt: String(first.departing_at ?? `${fallbackDate}T08:00:00`),
+    arriveAt: String(last.arriving_at ?? `${fallbackDate}T12:00:00`),
+    durationMinutes,
+    stops: Math.max(0, segmentsRaw.length - 1),
+    layovers,
+    segments: segmentsRaw.map((seg) => {
+      const op = rec(seg.operating_carrier);
+      const mk = rec(seg.marketing_carrier);
+      return {
+        airline: String(op.name ?? mk.name ?? owner.name ?? ""),
+        airlineCode: String(op.iata_code ?? mk.iata_code ?? ""),
+        flightNumber: String(seg.marketing_carrier_flight_number ?? seg.operating_carrier_flight_number ?? ""),
+        from: String(rec(seg.origin).iata_code ?? ""),
+        to: String(rec(seg.destination).iata_code ?? ""),
+        departAt: String(seg.departing_at ?? ""),
+        arriveAt: String(seg.arriving_at ?? ""),
+        durationMinutes: isoDurationMinutes(seg.duration),
+      };
+    }),
+  };
+}
+
 function mapDuffelOffer(
   offer: Record<string, unknown>,
   prefs: TripPreferences,
   trip: Trip
 ): FlightOption {
   const slices = (offer.slices as Array<Record<string, unknown>> | undefined) ?? [];
-  const outbound = (slices[0]?.segments as Array<Record<string, unknown>> | undefined) ?? [];
-  const first = outbound[0] ?? {};
-  const last = outbound[outbound.length - 1] ?? first;
-  const owner = (offer.owner as Record<string, unknown>) ?? {};
+  const owner = rec(offer.owner);
   const total = Number(offer.total_amount ?? 0);
   const travelers = trip.adultCount + trip.childCount || 1;
+  const outbound = mapSlice(slices[0] ?? {}, owner, trip.departureCode, trip.destinationCode, trip.departureDate);
+  const inbound = slices[1]
+    ? mapSlice(slices[1], owner, trip.destinationCode, trip.departureCode, trip.returnDate ?? trip.departureDate)
+    : undefined;
+  const tags = ["Live Duffel offer"];
+  if (outbound.stops === 0) tags.push("Nonstop");
+  if (prefs.maxStops === "none" && outbound.stops === 0) tags.push("Matches nonstop request");
+  const hours = Math.max(1, Math.round(outbound.durationMinutes / 60));
+  const recommendReason = [
+    outbound.stops === 0 ? "Nonstop" : `${outbound.stops} stop${outbound.stops === 1 ? "" : "s"}`,
+    outbound.airline,
+    `${hours}h`,
+    `$${Math.round(total)}`,
+  ].join(" · ");
 
   return {
     id: String(offer.id ?? crypto.randomUUID()),
-    airline: String(owner.name ?? "Airline"),
-    airlineCode: String(owner.iata_code ?? ""),
-    flightNumber: String(first.operating_carrier_flight_number ?? first.marketing_carrier_flight_number ?? ""),
-    from: trip.departureCode,
-    to: trip.destinationCode,
-    departAt: String(first.departing_at ?? `${trip.departureDate}T08:00:00`),
-    arriveAt: String(last.arriving_at ?? `${trip.departureDate}T12:00:00`),
-    durationMinutes: isoDurationMinutes(slices[0]?.duration) || isoDurationMinutes(offer.total_duration) || 180,
-    stops: Math.max(0, outbound.length - 1),
-    layovers: [],
-    segments: outbound.map((seg) => ({
-      airline: String((seg.operating_carrier as Record<string, unknown> | undefined)?.name ?? owner.name ?? ""),
-      airlineCode: String((seg.operating_carrier as Record<string, unknown> | undefined)?.iata_code ?? ""),
-      flightNumber: String(seg.operating_carrier_flight_number ?? ""),
-      from: String((seg.origin as Record<string, unknown> | undefined)?.iata_code ?? ""),
-      to: String((seg.destination as Record<string, unknown> | undefined)?.iata_code ?? ""),
-      departAt: String(seg.departing_at ?? ""),
-      arriveAt: String(seg.arriving_at ?? ""),
-      durationMinutes: isoDurationMinutes(seg.duration),
-    })),
+    airline: outbound.airline,
+    airlineCode: outbound.airlineCode,
+    flightNumber: outbound.flightNumber,
+    from: outbound.from,
+    to: outbound.to,
+    departAt: outbound.departAt,
+    arriveAt: outbound.arriveAt,
+    durationMinutes: outbound.durationMinutes,
+    stops: outbound.stops,
+    layovers: outbound.layovers,
+    segments: outbound.segments,
+    returnFlight: inbound
+      ? {
+          airline: inbound.airline,
+          airlineCode: inbound.airlineCode,
+          flightNumber: inbound.flightNumber,
+          from: inbound.from,
+          to: inbound.to,
+          departAt: inbound.departAt,
+          arriveAt: inbound.arriveAt,
+          durationMinutes: inbound.durationMinutes,
+          stops: inbound.stops,
+          layovers: inbound.layovers,
+          segments: inbound.segments,
+          cabinClass: prefs.cabinClass,
+          pricePerTraveler: Math.round(total / travelers),
+          totalPrice: Math.round(total),
+          currency: String(offer.total_currency ?? "USD"),
+          bags: { carryOn: "See fare details", checked: "See fare details" },
+          fareRules: "Live Duffel fare. Review conditions on the offer before confirming.",
+          matchTags: tags,
+          score: 0,
+        }
+      : undefined,
     cabinClass: prefs.cabinClass,
     pricePerTraveler: Math.round(total / travelers),
     totalPrice: Math.round(total),
     currency: String(offer.total_currency ?? "USD"),
     bags: { carryOn: "See fare details", checked: "See fare details" },
     fareRules: "Live Duffel fare. Review conditions on the offer before confirming.",
-    matchTags: ["Live Duffel offer"],
+    matchTags: tags,
     score: Math.round(
       8000 / (Math.max(total, 1) / 10) +
-        2500 / Math.max(isoDurationMinutes(slices[0]?.duration) || 180, 60) +
-        (Math.max(0, outbound.length - 1) === 0 ? 40 : Math.max(0, outbound.length - 1) === 1 ? 12 : 0)
+        2500 / Math.max(outbound.durationMinutes, 60) +
+        (outbound.stops === 0 ? 40 : outbound.stops === 1 ? 12 : 0)
     ),
+    recommendReason,
   };
 }

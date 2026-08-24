@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PHOTOS } from "@/components/brand/travel-photo";
 import { ChoiceCard, ConfirmActions, SectionHeader } from "@/components/wizard/progress";
-import { LiveInsightBadge, PlaceMeta, SandboxNote, WorthKnowingPanel } from "@/components/trip/discovery";
+import { LiveInsightBadge, SandboxNote, WorthKnowingPanel } from "@/components/trip/discovery";
 
 const ACTIVITY_PHOTOS: Record<string, string> = {
   Tour: PHOTOS.city.src,
@@ -26,7 +26,11 @@ const ACTIVITY_PHOTOS: Record<string, string> = {
   Outdoors: PHOTOS.pack.src,
   Photo: PHOTOS.city.src,
   Experience: PHOTOS.road.src,
+  "Scuba diving": "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80",
+  Snorkeling: "https://images.unsplash.com/photo-1544551763-77ef2d0cfc6c?auto=format&fit=crop&w=800&q=80",
 };
+
+const ACTIVITY_CHIPS = ["scuba diving", "snorkeling", "food tour", "sunset cruise", "day trip", "museum"];
 
 export function GroundFlow({ bundle }: { bundle: TripBundle }) {
   const router = useRouter();
@@ -138,13 +142,13 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
         if (!res.ok) throw new Error(json.error || "Search failed");
         if (!cancelled) {
           setSuggestions(json.activities ?? []);
-          setWorthKnowing(json.worthKnowing ?? []);
+          setWorthKnowing(json.worthKnowing ?? json.worthKnowing ?? []);
           setSandbox(Boolean(json.sandbox));
           setLive(Boolean(json.live));
-          setTotalPages(json.totalPages ?? 1);
-          setAllCount(json.allCount ?? (json.activities ?? []).length);
-          setHighestPrice(json.highestPrice ?? 0);
-          setLowestPrice(json.lowestPrice ?? 0);
+          setTotalPages(json.totalPages ?? json.totalPages ?? 1);
+          setAllCount(json.allCount ?? json.allCount ?? (json.activities ?? []).length);
+          setHighestPrice(json.highestPrice ?? json.highestPrice ?? 0);
+          setLowestPrice(json.lowestPrice ?? json.lowestPrice ?? 0);
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Search failed");
@@ -174,25 +178,54 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
         title="Want stuff to do?"
         description="Search live tours, then pick what is actually worth it. Best value sits at the top — not always the cheapest. Nothing is added until you confirm."
       />
-      <div className="mb-5 grid gap-3 sm:grid-cols-[1fr_auto]">
+      <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_auto]">
         <input
           className="h-11 rounded-full border bg-white px-4 text-sm"
           placeholder='Try “scuba diving”, “food tour”, “sunset cruise”'
           value={queryInput}
           onChange={(e) => setQueryInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              setQuery(queryInput.trim());
+              setPage(1);
+            }
+          }}
         />
         <p className="self-center text-xs text-muted-foreground">
-          {live ? "Live Viator inventory" : sandbox ? "Sample tours while sandbox is on" : "Catalog"}
+          {live ? "Live Viator tours" : sandbox ? "Sample tours while sandbox is on" : "Catalog"}
         </p>
       </div>
+      <div className="mb-4 flex flex-wrap gap-2">
+        {ACTIVITY_CHIPS.map((chip) => (
+          <button
+            key={chip}
+            type="button"
+            className={`rounded-full border px-3 py-1 text-xs ${
+              queryInput.toLowerCase() === chip ? "border-channel bg-channel/10 text-channel" : "bg-white text-pencil"
+            }`}
+            onClick={() => {
+              setQueryInput(chip);
+              setQuery(chip);
+              setPage(1);
+            }}
+          >
+            {chip}
+          </button>
+        ))}
+      </div>
       {highestPrice > 0 ? (
-        <p className="mb-4 text-sm text-muted-foreground">
-          {allCount} real-looking options · from {formatCurrency(lowestPrice)} to{" "}
-          <span className="font-medium text-soundings">{formatCurrency(highestPrice)}</span> per person · best value first
-        </p>
+        <div className="mb-4 rounded-2xl border bg-white px-4 py-3 text-sm">
+          <p className="font-medium text-soundings">
+            Highest price in this list: {formatCurrency(highestPrice)} per person
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            {allCount} live tours · from {formatCurrency(lowestPrice)} · ranked by bang for buck, not cheapest first
+            {totalPages > 1 ? ` · page ${page} of ${totalPages}` : ""}
+          </p>
+        </div>
       ) : null}
       {sandbox ? <SandboxNote inventory="tours" research="destination" /> : null}
-      {loading ? (
+      {loading && suggestions.length === 0 ? (
         <div className="py-12 text-center">
           <p className="text-sm font-medium text-channel">One sec</p>
           <h2 className="mt-3 text-2xl font-semibold">Looking for things to do…</h2>
@@ -239,6 +272,9 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
                   <p className="font-medium">{activity.name}</p>
                   <p className="text-sm text-muted-foreground">{activity.description}</p>
                   <p className="mt-1 text-xs">{activity.duration}</p>
+                  {activity.valueReason ? (
+                    <p className="mt-1 text-xs text-channel">{activity.valueReason}</p>
+                  ) : null}
                   {activity.rating ? (
                     <p className="mt-1 text-xs text-muted-foreground">
                       {activity.rating.toFixed(1)} rating
@@ -302,6 +338,11 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
           Select {picked.length || ""} {picked.length === 1 ? "activity" : "activities"}
         </Button>
       </div>
+      {picked.length > 0 ? (
+        <p className="sticky bottom-4 mt-4 rounded-full border bg-white/95 px-4 py-2 text-center text-sm shadow-sm">
+          {picked.length} selected · {formatCurrency(picked.reduce((sum, a) => sum + a.pricePerPerson, 0))} per person
+        </p>
+      ) : null}
     </div>
   );
 }

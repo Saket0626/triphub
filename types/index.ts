@@ -251,6 +251,7 @@ export interface ActivityOption {
   inclusions?: string[];
   freeCancellation?: boolean;
   valueScore?: number;
+  valueReason?: string;
   source?: "viator" | "mock";
   place?: PlaceSnapshot;
   liveInsights?: ResearchFinding[];

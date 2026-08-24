@@ -160,6 +160,16 @@ export function FlightSearch({ bundle }: { bundle: TripBundle }) {
                 <p className="font-medium">Fare rules</p>
                 <p className="text-muted-foreground">{selected.fareRules}</p>
               </div>
+              <a
+                href={`https://www.google.com/search?q=${encodeURIComponent(
+                  `${selected.airline} ${selected.flightNumber} ${selected.from} ${selected.to} ${selected.departAt.slice(0, 10)}`
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                className="block text-sm font-medium text-channel hover:underline"
+              >
+                Check this flight on Google
+              </a>
               <Button className="w-full" size="lg" onClick={() => choose(selected)}>
                 Select this flight
               </Button>
