@@ -30,7 +30,16 @@ const ACTIVITY_PHOTOS: Record<string, string> = {
   Snorkeling: "https://images.unsplash.com/photo-1544551763-77ef2d0cfc6c?auto=format&fit=crop&w=800&q=80",
 };
 
-const ACTIVITY_CHIPS = ["scuba diving", "snorkeling", "food tour", "sunset cruise", "day trip", "museum"];
+const ACTIVITY_CHIPS = [
+  "scuba diving",
+  "snorkeling",
+  "restaurants",
+  "food tour",
+  "luau",
+  "sunset cruise",
+  "day trip",
+  "museum",
+];
 
 export function GroundFlow({ bundle }: { bundle: TripBundle }) {
   const router = useRouter();
@@ -137,6 +146,7 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tripId: bundle.trip.id, query: query || undefined, page }),
+          signal: AbortSignal.timeout(45_000),
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Search failed");
@@ -176,12 +186,12 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
       <SectionHeader
         eyebrow="Activities"
         title="Want stuff to do?"
-        description="Search live tours, then pick what is actually worth it. Best value sits at the top — not always the cheapest. Nothing is added until you confirm."
+        description="Search anything — scuba, restaurants, a luau. Best overall sits at the top: high ratings, real extras, and a price that does not waste your money."
       />
       <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_auto]">
         <input
           className="h-11 rounded-full border bg-white px-4 text-sm"
-          placeholder='Try “scuba diving”, “food tour”, “sunset cruise”'
+          placeholder='Try “scuba diving”, “restaurants”, “sunset cruise”'
           value={queryInput}
           onChange={(e) => setQueryInput(e.target.value)}
           onKeyDown={(e) => {
@@ -212,6 +222,19 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
             {chip}
           </button>
         ))}
+        {queryInput ? (
+          <button
+            type="button"
+            className="rounded-full border bg-white px-3 py-1 text-xs text-muted-foreground"
+            onClick={() => {
+              setQueryInput("");
+              setQuery("");
+              setPage(1);
+            }}
+          >
+            Clear
+          </button>
+        ) : null}
       </div>
       {highestPrice > 0 ? (
         <div className="mb-4 rounded-2xl border bg-white px-4 py-3 text-sm">
@@ -219,12 +242,15 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
             Highest price in this list: {formatCurrency(highestPrice)} per person
           </p>
           <p className="mt-1 text-muted-foreground">
-            {allCount} live tours · from {formatCurrency(lowestPrice)} · ranked by bang for buck, not cheapest first
+            {allCount} live tours · from {formatCurrency(lowestPrice)} · ranked best overall — high ratings at a fair price
             {totalPages > 1 ? ` · page ${page} of ${totalPages}` : ""}
           </p>
         </div>
       ) : null}
       {sandbox ? <SandboxNote inventory="tours" research="destination" /> : null}
+      {loading && suggestions.length > 0 ? (
+        <p className="mb-3 text-sm font-medium text-channel">Updating results…</p>
+      ) : null}
       {loading && suggestions.length === 0 ? (
         <div className="py-12 text-center">
           <p className="text-sm font-medium text-channel">One sec</p>
@@ -262,7 +288,7 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
                     <p className="text-xs font-medium uppercase tracking-wide text-channel">{activity.category}</p>
                     {page === 1 && index === 0 ? (
                       <span className="rounded-full bg-channel/10 px-2 py-0.5 text-[11px] font-medium text-channel">
-                        Best value
+                        Best overall
                       </span>
                     ) : null}
                     {activity.freeCancellation ? (
@@ -270,7 +296,7 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
                     ) : null}
                   </div>
                   <p className="font-medium">{activity.name}</p>
-                  <p className="text-sm text-muted-foreground">{activity.description}</p>
+                  <p className="text-sm text-muted-foreground line-clamp-2">{activity.description}</p>
                   <p className="mt-1 text-xs">{activity.duration}</p>
                   {activity.valueReason ? (
                     <p className="mt-1 text-xs text-channel">{activity.valueReason}</p>
@@ -287,12 +313,23 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
                       href={activity.productUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-1 inline-block text-xs font-medium text-channel hover:underline"
+                      className="mt-1 mr-3 inline-block text-xs font-medium text-channel hover:underline"
                       onClick={(e) => e.stopPropagation()}
                     >
                       Open on Viator to verify
                     </a>
                   ) : null}
+                  <a
+                    href={`https://www.google.com/search?q=${encodeURIComponent(
+                      `${activity.productCode ?? ""} ${activity.name} Viator`
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 inline-block text-xs font-medium text-channel hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Check on Google
+                  </a>
                 </div>
                 <div className="shrink-0 text-right">
                   {activity.listPrice ? (

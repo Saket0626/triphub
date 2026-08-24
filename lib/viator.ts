@@ -625,7 +625,7 @@ async function fetchViatorPages(destination: DestRef, trip: Trip, query?: string
   const products: ViatorProduct[] = [];
   const seen = new Set<string>();
   const destIds = Array.from(new Set([destination.id, destination.parentId].filter(Boolean))) as string[];
-  const variants = queryVariants(query);
+  const variants = queryVariants(query).slice(0, 2);
 
   async function pull(fetcher: () => Promise<ViatorProduct[]>) {
     try {
@@ -642,56 +642,43 @@ async function fetchViatorPages(destination: DestRef, trip: Trip, query?: string
     }
   }
 
-  if (variants.length) {
+  const jobs: Array<() => Promise<number>> = [];
+  if (query) {
+    const terms = variants.length ? variants : [query];
     for (const destId of destIds) {
-      for (const term of variants) {
-        for (const start of [1, 51]) {
-          const count = await pull(() => searchViatorFreetext(term, destId, trip, start, 50));
-          if (count < 50) break;
-        }
+      for (const term of terms) {
+        jobs.push(() => pull(() => searchViatorFreetext(term, destId, trip, 1, 50)));
+        jobs.push(() => pull(() => searchViatorFreetext(term, destId, trip, 51, 50)));
       }
     }
+    await Promise.all(jobs.map((job) => job()));
+    if (products.length >= 8) return products;
   }
 
-  if (!query || products.length < 16) {
-    for (const destId of destIds) {
-      for (const start of query ? [1, 51] : [1, 51, 101]) {
-        const count = await pull(() => searchViatorCatalog(destId, trip, start, 50));
-        if (count < 50) break;
-      }
-    }
-  }
+  const catalogJobs = destIds.flatMap((destId) => [
+    () => pull(() => searchViatorCatalog(destId, trip, 1, 50)),
+    () => pull(() => searchViatorCatalog(destId, trip, 51, 50)),
+  ]);
+  await Promise.all(catalogJobs.map((job) => job()));
   return products;
 }
 
 async function searchViatorCatalog(destinationId: string, trip: Trip, start: number, count: number) {
+  void trip;
   const dest = Number(destinationId) || destinationId;
-  const bodies = [
-    {
-      filtering: {
-        destination: dest,
-        dateRange: { from: trip.departureDate, to: trip.returnDate ?? trip.departureDate },
-      },
-    },
-    { filtering: { destination: dest } },
-  ];
-  for (const extra of bodies) {
-    const res = await fetch(`${VIATOR_BASE}/products/search`, {
-      method: "POST",
-      headers: await viatorHeaders(),
-      body: JSON.stringify({
-        ...extra,
-        sorting: { sort: "TRAVELER_RATING", order: "DESCENDING" },
-        pagination: { start, count },
-        currency: "USD",
-      }),
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!res.ok) continue;
-    const products = extractProducts(rec(await res.json()));
-    if (products.length) return products;
-  }
-  return [];
+  const res = await fetch(`${VIATOR_BASE}/products/search`, {
+    method: "POST",
+    headers: await viatorHeaders(),
+    body: JSON.stringify({
+      filtering: { destination: dest },
+      sorting: { sort: "TRAVELER_RATING", order: "DESCENDING" },
+      pagination: { start, count },
+      currency: "USD",
+    }),
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!res.ok) return [];
+  return extractProducts(rec(await res.json()));
 }
 
 async function searchViatorFreetext(
@@ -701,29 +688,29 @@ async function searchViatorFreetext(
   start: number,
   count: number
 ) {
+  void trip;
   const dest = Number(destinationId) || destinationId;
-  const filters = [
-    {
-      destination: dest,
-      dateRange: { from: trip.departureDate, to: trip.returnDate ?? trip.departureDate },
-    },
-    { destination: dest },
-  ];
-  for (const productFiltering of filters) {
-    const res = await fetch(`${VIATOR_BASE}/search/freetext`, {
-      method: "POST",
-      headers: await viatorHeaders(),
-      body: JSON.stringify({
-        searchTerm,
-        productFiltering,
-        searchTypes: [{ searchType: "PRODUCTS", pagination: { start, count } }],
-        currency: "USD",
-      }),
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!res.ok) continue;
-    const products = extractProducts(rec(await res.json()));
-    if (products.length) return products;
+  const res = await fetch(`${VIATOR_BASE}/search/freetext`, {
+    method: "POST",
+    headers: await viatorHeaders(),
+    body: JSON.stringify({
+      searchTerm,
+      productFiltering: { destination: dest },
+      searchTypes: [{ searchType: "PRODUCTS", pagination: { start, count } }],
+      currency: "USD",
+    }),
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!res.ok) return [];
+  const json = rec(await res.json());
+  const products = extractProducts(json);
+  if (products.length) return products;
+  const nested = rec(json.products);
+  if (Array.isArray(nested.results)) return nested.results as ViatorProduct[];
+  const freetext = rec(json.searchResults ?? json.productResults ?? json);
+  for (const key of ["products", "results", "items"]) {
+    const rows = freetext[key];
+    if (Array.isArray(rows)) return rows as ViatorProduct[];
   }
   return [];
 }

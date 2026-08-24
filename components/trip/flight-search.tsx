@@ -140,6 +140,16 @@ export function FlightSearch({ bundle }: { bundle: TripBundle }) {
               <button type="button" className="w-full text-left" onClick={() => setSelected(flight)}>
                 <FlightSummary flight={flight} travelers={bundle.trip.adultCount + bundle.trip.childCount} />
               </button>
+              <a
+                href={`https://www.google.com/search?q=${encodeURIComponent(
+                  `${flight.airline} ${flight.flightNumber} ${flight.from} ${flight.to}`
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-block text-xs font-medium text-channel hover:underline"
+              >
+                Check this flight on Google
+              </a>
               <PointsCompare comparisons={compareFlightPoints(flight, bundle.loyaltyWallets ?? [])} />
             </CardContent>
           </Card>

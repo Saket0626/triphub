@@ -37,12 +37,11 @@ export async function POST(request: Request) {
         research = await runDestinationResearch(bundle.trip);
         await saveCachedResearch(bundle.trip, cacheKey, research);
       } catch {
-        const { mockDestinationResearch } = await import("@/lib/mock-research");
-        research = mockDestinationResearch(bundle.trip);
+        research = undefined;
       }
     }
-
-    const withInsights = attachActivityInsights(activities, research);
+    const usable = research && research.source !== "mock" ? research : null;
+    const withInsights = usable ? attachActivityInsights(activities, usable) : activities;
     const used = withInsights.flatMap((a) => a.liveInsights ?? []);
     const paged = paginateActivities(withInsights, page ?? 1, ACTIVITY_PAGE_SIZE);
     return NextResponse.json({
@@ -53,11 +52,11 @@ export async function POST(request: Request) {
       totalPages: paged.totalPages,
       highestPrice: paged.highestPrice,
       lowestPrice: paged.lowestPrice,
-      worthKnowing: unmatchedFindings(research, used),
-      research,
+      worthKnowing: usable ? unmatchedFindings(usable, used) : [],
+      research: usable,
       inventorySource,
       live,
-      researchSource: research.source,
+      researchSource: usable?.source ?? null,
       sandbox: env.sandboxMode,
     });
   } catch (error) {

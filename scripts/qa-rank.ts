@@ -40,6 +40,56 @@ if (scuba[0]?.id === cheapest?.id && scuba.length > 3 && (scuba[0]?.rating ?? 0)
 }
 if (scuba.some((a) => a.pricePerPerson <= 0)) problems.push("found a $0 activity");
 
+const cheapStar = rankActivities([
+  {
+    id: "cheap-great",
+    name: "Well-reviewed beginner scuba",
+    description: "scuba",
+    duration: "2 hours",
+    durationMinutes: 120,
+    pricePerPerson: 78,
+    totalPrice: 156,
+    category: "Scuba diving",
+    rating: 4.9,
+    reviewCount: 3500,
+    freeCancellation: true,
+  },
+  {
+    id: "pricey-great",
+    name: "Private scuba charter",
+    description: "scuba",
+    duration: "6 hours",
+    durationMinutes: 360,
+    pricePerPerson: 349,
+    totalPrice: 698,
+    category: "Scuba diving",
+    rating: 4.9,
+    reviewCount: 80,
+    freeCancellation: true,
+  },
+  {
+    id: "cheap-poor",
+    name: "Bargain scuba",
+    description: "scuba",
+    duration: "1 hour",
+    durationMinutes: 60,
+    pricePerPerson: 49,
+    totalPrice: 98,
+    category: "Scuba diving",
+    rating: 3.4,
+    reviewCount: 9,
+  },
+]);
+if (cheapStar[0]?.id !== "cheap-great") {
+  problems.push(`best overall should be the high-rated fair price, got ${cheapStar[0]?.id}`);
+}
+if (cheapStar.findIndex((a) => a.id === "cheap-poor") < cheapStar.findIndex((a) => a.id === "cheap-great")) {
+  problems.push("cheap poorly-rated should not beat a well-rated fair price");
+}
+
+const food = all.filter((a) => activityMatchesQuery(a, "restaurants"));
+if (food.length < 1) problems.push("restaurants search should match food/dining tours");
+
 console.log(
   JSON.stringify(
     {
