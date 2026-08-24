@@ -303,7 +303,7 @@ function BasicsStep({
           </select>
         </Field>
       </div>
-      <StepNav onNext={() => form.handleSubmit((data) => { onChange(data); onNext(); })()} />
+      <StepNav submit />
     </form>
   );
 }
@@ -525,7 +525,7 @@ function TravelersStep({
           <p className="text-sm text-destructive">{form.formState.errors.travelers.message}</p>
         ) : null}
       </div>
-      <StepNav onBack={onBack} onNext={() => form.handleSubmit((data) => { onChange(data); onNext(); })()} />
+      <StepNav onBack={onBack} submit />
     </form>
   );
 }
@@ -695,7 +695,7 @@ function PrefsStep({
           <Textarea placeholder="Wheelchair assist, extra time, dietary notes…" {...form.register("specialAssistance")} />
         </Field>
       </div>
-      <StepNav onBack={onBack} onNext={() => form.handleSubmit((data) => { onChange(data); onNext(); })()} />
+      <StepNav onBack={onBack} submit />
     </form>
   );
 }

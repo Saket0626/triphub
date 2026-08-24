@@ -103,18 +103,36 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
   const [suggestions, setSuggestions] = useState<ActivityOption[]>([]);
   const [worthKnowing, setWorthKnowing] = useState<ResearchFinding[]>([]);
   const [sandbox, setSandbox] = useState(true);
+  const [live, setLive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<ActivityOption[]>([]);
+  const [queryInput, setQueryInput] = useState("");
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [allCount, setAllCount] = useState(0);
+  const [highestPrice, setHighestPrice] = useState(0);
+  const [lowestPrice, setLowestPrice] = useState(0);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setQuery(queryInput.trim());
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [queryInput]);
 
   useEffect(() => {
     let cancelled = false;
     async function run() {
+      setLoading(true);
+      setError(null);
       try {
         const res = await fetch("/api/activities/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tripId: bundle.trip.id }),
+          body: JSON.stringify({ tripId: bundle.trip.id, query: query || undefined, page }),
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Search failed");
@@ -122,6 +140,11 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
           setSuggestions(json.activities ?? []);
           setWorthKnowing(json.worthKnowing ?? []);
           setSandbox(Boolean(json.sandbox));
+          setLive(Boolean(json.live));
+          setTotalPages(json.totalPages ?? 1);
+          setAllCount(json.allCount ?? (json.activities ?? []).length);
+          setHighestPrice(json.highestPrice ?? 0);
+          setLowestPrice(json.lowestPrice ?? 0);
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Search failed");
@@ -133,7 +156,7 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
     return () => {
       cancelled = true;
     };
-  }, [bundle.trip.id]);
+  }, [bundle.trip.id, query, page]);
 
   function toggle(option: ActivityOption) {
     setPicked((cur) => (cur.some((x) => x.id === option.id) ? cur.filter((x) => x.id !== option.id) : [...cur, option]));
@@ -144,31 +167,52 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
     router.push(`/trip/${bundle.trip.id}/activities/confirm`);
   }
 
-  if (loading) {
-    return (
-      <div className="py-16 text-center">
-        <p className="text-sm font-medium text-channel">One sec</p>
-        <h1 className="mt-3 text-3xl font-semibold">Looking for things to do…</h1>
-      </div>
-    );
-  }
-  if (error) return <p className="text-destructive">{error}</p>;
-
   return (
     <div className="animate-fade-up">
       <SectionHeader
         eyebrow="Activities"
         title="Want stuff to do?"
-        description="A few ideas for the destination. Skip anything. Nothing gets added until you confirm."
+        description="Search live tours, then pick what is actually worth it. Best value sits at the top — not always the cheapest. Nothing is added until you confirm."
       />
+      <div className="mb-5 grid gap-3 sm:grid-cols-[1fr_auto]">
+        <input
+          className="h-11 rounded-full border bg-white px-4 text-sm"
+          placeholder='Try “scuba diving”, “food tour”, “sunset cruise”'
+          value={queryInput}
+          onChange={(e) => setQueryInput(e.target.value)}
+        />
+        <p className="self-center text-xs text-muted-foreground">
+          {live ? "Live Viator inventory" : sandbox ? "Sample tours while sandbox is on" : "Catalog"}
+        </p>
+      </div>
+      {highestPrice > 0 ? (
+        <p className="mb-4 text-sm text-muted-foreground">
+          {allCount} real-looking options · from {formatCurrency(lowestPrice)} to{" "}
+          <span className="font-medium text-soundings">{formatCurrency(highestPrice)}</span> per person · best value first
+        </p>
+      ) : null}
       {sandbox ? <SandboxNote inventory="tours" research="destination" /> : null}
-      {suggestions.length === 0 ? (
+      {loading ? (
+        <div className="py-12 text-center">
+          <p className="text-sm font-medium text-channel">One sec</p>
+          <h2 className="mt-3 text-2xl font-semibold">Looking for things to do…</h2>
+        </div>
+      ) : null}
+      {error ? (
+        <p className="mb-6 text-destructive">
+          {error}{" "}
+          <button type="button" className="underline" onClick={() => setPage(1)}>
+            Try again
+          </button>
+        </p>
+      ) : null}
+      {!loading && suggestions.length === 0 ? (
         <p className="mb-6 rounded-2xl border border-dashed border-black/10 px-5 py-8 text-sm text-muted-foreground">
-          No tours came back for those dates. You can skip this step and keep going.
+          No tours matched {query ? `“${query}”` : "those dates"}. Try another search, or skip this step.
         </p>
       ) : null}
       <div className="grid gap-3">
-        {suggestions.map((activity) => (
+        {suggestions.map((activity, index) => (
           <div key={activity.id}>
             <ChoiceCard selected={picked.some((p) => p.id === activity.id)} onClick={() => toggle(activity)}>
               <div className="flex items-start gap-4">
@@ -181,19 +225,43 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
                   aria-label={activity.name}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium uppercase tracking-wide text-channel">{activity.category}</p>
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-channel">{activity.category}</p>
+                    {page === 1 && index === 0 ? (
+                      <span className="rounded-full bg-channel/10 px-2 py-0.5 text-[11px] font-medium text-channel">
+                        Best value
+                      </span>
+                    ) : null}
+                    {activity.freeCancellation ? (
+                      <span className="text-[11px] text-muted-foreground">Free cancellation</span>
+                    ) : null}
+                  </div>
                   <p className="font-medium">{activity.name}</p>
                   <p className="text-sm text-muted-foreground">{activity.description}</p>
                   <p className="mt-1 text-xs">{activity.duration}</p>
-                  <PlaceMeta
-                    rating={activity.place?.rating ?? activity.rating}
-                    ratingCount={activity.place?.ratingCount ?? activity.reviewCount}
-                    hoursSummary={activity.place?.hoursSummary}
-                    businessStatus={activity.place?.businessStatus}
-                    source={activity.place?.source}
-                  />
+                  {activity.rating ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {activity.rating.toFixed(1)} rating
+                      {activity.reviewCount ? ` (${activity.reviewCount.toLocaleString()} reviews)` : ""}
+                      {activity.productCode ? ` · ${activity.productCode}` : ""}
+                    </p>
+                  ) : null}
+                  {activity.productUrl ? (
+                    <a
+                      href={activity.productUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 inline-block text-xs font-medium text-channel hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Open on Viator to verify
+                    </a>
+                  ) : null}
                 </div>
                 <div className="shrink-0 text-right">
+                  {activity.listPrice ? (
+                    <p className="text-xs text-muted-foreground line-through">{formatCurrency(activity.listPrice)}</p>
+                  ) : null}
                   <p className="text-xl font-semibold">{formatCurrency(activity.pricePerPerson)}</p>
                   <p className="text-xs text-muted-foreground">per person</p>
                 </div>
@@ -207,6 +275,24 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
           </div>
         ))}
       </div>
+      {totalPages > 1 ? (
+        <div className="mt-6 flex items-center justify-center gap-3">
+          <Button variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+            Previous
+          </Button>
+          <p className="text-sm text-muted-foreground">
+            Page {page} of {totalPages}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages || loading}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            Next
+          </Button>
+        </div>
+      ) : null}
       <WorthKnowingPanel findings={worthKnowing} />
       <div className="mt-8 flex flex-wrap gap-3">
         <Button variant="outline" onClick={() => go(true)}>

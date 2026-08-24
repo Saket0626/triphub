@@ -1,22 +1,23 @@
 /** Activities discovery: Viator inventory + Places snapshots. */
 
-import { searchViatorActivities, isLiveViator } from "@/lib/viator";
-import { lookupPlace } from "@/lib/places";
+import { searchViatorActivities } from "@/lib/viator";
+import { rankActivities } from "@/lib/activity-rank";
 import type { ActivityOption, Trip } from "@/types";
 
-export async function searchActivities(trip: Trip): Promise<{
+export async function searchActivities(
+  trip: Trip,
+  query?: string
+): Promise<{
   activities: ActivityOption[];
   inventorySource: "mock" | "viator";
+  live: boolean;
+  total: number;
 }> {
-  const activities = await searchViatorActivities(trip);
-  const enriched = await Promise.all(
-    activities.map(async (activity) => ({
-      ...activity,
-      place: await lookupPlace(`${activity.name} ${trip.destinationLabel.split("(")[0].trim()}`),
-    }))
-  );
+  const { activities, total, live } = await searchViatorActivities(trip, { query, start: 1, count: 50 });
   return {
-    activities: enriched,
-    inventorySource: isLiveViator() ? "viator" : "mock",
+    activities: rankActivities(activities),
+    inventorySource: live ? "viator" : "mock",
+    live,
+    total,
   };
 }

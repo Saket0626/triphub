@@ -81,7 +81,7 @@ async function searchDuffel(trip: Trip, prefs: TripPreferences): Promise<FlightO
     data?: { offers?: Array<Record<string, unknown>> };
   };
   const offers = json.data?.offers ?? [];
-  return offers.slice(0, 12).map((offer) => mapDuffelOffer(offer, prefs, trip));
+  return offers.slice(0, 24).map((offer) => mapDuffelOffer(offer, prefs, trip));
 }
 
 function isoDurationMinutes(iso: unknown) {
@@ -124,7 +124,7 @@ function mapDuffelOffer(
       to: String((seg.destination as Record<string, unknown> | undefined)?.iata_code ?? ""),
       departAt: String(seg.departing_at ?? ""),
       arriveAt: String(seg.arriving_at ?? ""),
-      durationMinutes: 0,
+      durationMinutes: isoDurationMinutes(seg.duration),
     })),
     cabinClass: prefs.cabinClass,
     pricePerTraveler: Math.round(total / travelers),
@@ -133,6 +133,10 @@ function mapDuffelOffer(
     bags: { carryOn: "See fare details", checked: "See fare details" },
     fareRules: "Live Duffel fare. Review conditions on the offer before confirming.",
     matchTags: ["Live Duffel offer"],
-    score: 50,
+    score: Math.round(
+      8000 / (Math.max(total, 1) / 10) +
+        2500 / Math.max(isoDurationMinutes(slices[0]?.duration) || 180, 60) +
+        (Math.max(0, outbound.length - 1) === 0 ? 40 : Math.max(0, outbound.length - 1) === 1 ? 12 : 0)
+    ),
   };
 }

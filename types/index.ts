@@ -238,13 +238,20 @@ export interface ActivityOption {
   name: string;
   description: string;
   duration: string;
+  durationMinutes?: number;
   pricePerPerson: number;
+  listPrice?: number;
   totalPrice: number;
   category: string;
   productCode?: string;
+  productUrl?: string;
   photoUrl?: string;
   rating?: number;
   reviewCount?: number;
+  inclusions?: string[];
+  freeCancellation?: boolean;
+  valueScore?: number;
+  source?: "viator" | "mock";
   place?: PlaceSnapshot;
   liveInsights?: ResearchFinding[];
 }

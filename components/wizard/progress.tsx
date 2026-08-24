@@ -101,12 +101,14 @@ export function StepNav({
   nextLabel = "Continue",
   backLabel = "Back",
   disableNext,
+  submit = false,
 }: {
   onBack?: () => void;
   onNext?: () => void;
   nextLabel?: string;
   backLabel?: string;
   disableNext?: boolean;
+  submit?: boolean;
 }) {
   return (
     <div className="mt-10 flex items-center justify-between gap-4">
@@ -117,11 +119,9 @@ export function StepNav({
       ) : (
         <span />
       )}
-      {onNext ? (
-        <Button type="button" onClick={onNext} disabled={disableNext}>
-          {nextLabel}
-        </Button>
-      ) : null}
+      <Button type={submit ? "submit" : "button"} onClick={submit ? undefined : onNext} disabled={disableNext}>
+        {nextLabel}
+      </Button>
     </div>
   );
 }

@@ -5,25 +5,30 @@ import { z } from "zod";
 import { getCachedResearch, getTripBundle, saveCachedResearch } from "@/lib/db";
 import { searchActivities } from "@/lib/activities";
 import { attachActivityInsights, unmatchedFindings } from "@/lib/insights";
+import { ACTIVITY_PAGE_SIZE, paginateActivities } from "@/lib/activity-rank";
 import { researchCacheKey, runDestinationResearch } from "@/lib/research";
 import { env } from "@/lib/env";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const bodySchema = z.object({ tripId: z.string().min(1) });
+const bodySchema = z.object({
+  tripId: z.string().min(1),
+  query: z.string().max(80).optional(),
+  page: z.number().int().min(1).optional(),
+});
 
 export async function POST(request: Request) {
   try {
-    const { tripId } = bodySchema.parse(await request.json());
+    const { tripId, query, page } = bodySchema.parse(await request.json());
     const bundle = await getTripBundle(tripId);
     if (!bundle) {
       return NextResponse.json({ error: "Trip not found" }, { status: 404 });
     }
 
     const cacheKey = researchCacheKey(bundle.trip);
-    const [{ activities, inventorySource }, cached] = await Promise.all([
-      searchActivities(bundle.trip),
+    const [{ activities, inventorySource, live, total }, cached] = await Promise.all([
+      searchActivities(bundle.trip, query),
       getCachedResearch(cacheKey),
     ]);
     const research = cached ?? (await runDestinationResearch(bundle.trip));
@@ -31,11 +36,19 @@ export async function POST(request: Request) {
 
     const withInsights = attachActivityInsights(activities, research);
     const used = withInsights.flatMap((a) => a.liveInsights ?? []);
+    const paged = paginateActivities(withInsights, page ?? 1, ACTIVITY_PAGE_SIZE);
     return NextResponse.json({
-      activities: withInsights,
+      activities: paged.items,
+      allCount: total,
+      page: paged.page,
+      pageSize: paged.pageSize,
+      totalPages: paged.totalPages,
+      highestPrice: paged.highestPrice,
+      lowestPrice: paged.lowestPrice,
       worthKnowing: unmatchedFindings(research, used),
       research,
       inventorySource,
+      live,
       researchSource: research.source,
       sandbox: env.sandboxMode,
     });
