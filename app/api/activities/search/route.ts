@@ -31,8 +31,16 @@ export async function POST(request: Request) {
       searchActivities(bundle.trip, query),
       getCachedResearch(cacheKey),
     ]);
-    const research = cached ?? (await runDestinationResearch(bundle.trip));
-    if (!cached) await saveCachedResearch(bundle.trip, cacheKey, research);
+    let research = cached;
+    if (!research) {
+      try {
+        research = await runDestinationResearch(bundle.trip);
+        await saveCachedResearch(bundle.trip, cacheKey, research);
+      } catch {
+        const { mockDestinationResearch } = await import("@/lib/mock-research");
+        research = mockDestinationResearch(bundle.trip);
+      }
+    }
 
     const withInsights = attachActivityInsights(activities, research);
     const used = withInsights.flatMap((a) => a.liveInsights ?? []);

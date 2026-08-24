@@ -49,6 +49,17 @@ export function AirportAutocomplete({
           if (!e.target.value) onChange(null);
         }}
         onFocus={() => setOpen(true)}
+        onBlur={() => {
+          const exact = searchAirports(query, 8).find(
+            (airport) =>
+              airport.code.toLowerCase() === query.trim().toLowerCase() ||
+              airport.city.toLowerCase() === query.trim().toLowerCase()
+          );
+          if (exact) {
+            onChange(exact);
+            setQuery(airportLabel(exact));
+          }
+        }}
       />
       {open ? (
         <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-border bg-white p-1 shadow-lg">

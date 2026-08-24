@@ -10,6 +10,7 @@
 
 import { env } from "@/lib/env";
 import { generateMockFlights } from "@/lib/mock-flights";
+import { collapseFlights, isImplausibleFlight } from "@/lib/flight-realism";
 import type { FlightOption, Trip, TripPreferences } from "@/types";
 
 export async function searchFlights(trip: Trip, prefs: TripPreferences): Promise<FlightOption[]> {
@@ -88,16 +89,15 @@ async function searchDuffel(trip: Trip, prefs: TripPreferences): Promise<FlightO
       const code = flight.airlineCode.toUpperCase();
       if (airline.includes("duffel") || code === "ZZ") return false;
       if (!flight.flightNumber) return false;
-      if (flight.from && flight.from !== trip.departureCode) return false;
-      if (flight.to && flight.to !== trip.destinationCode) return false;
+      if (isImplausibleFlight(flight, trip)) return false;
       return true;
     })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 24);
+    .sort((a, b) => b.score - a.score);
+  const collapsed = collapseFlights(mapped).slice(0, 24);
   if (!mapped.length) {
     throw new Error("Duffel did not return real airline offers for this route. Try different dates or nearby airports.");
   }
-  return mapped;
+  return collapsed;
 }
 
 function rec(value: unknown): Record<string, unknown> {

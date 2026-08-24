@@ -217,8 +217,8 @@ function BasicsStep({
             valueLabel={form.watch("departureLabel")}
             placeholder="City or airport code"
             onChange={(airport) => {
-              form.setValue("departureCode", airport?.code ?? "", { shouldValidate: true });
-              form.setValue("departureLabel", airport ? airportLabel(airport) : "");
+              form.setValue("departureCode", airport?.code ?? "", { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+              form.setValue("departureLabel", airport ? airportLabel(airport) : "", { shouldValidate: true, shouldDirty: true });
             }}
           />
         </Field>
@@ -229,8 +229,8 @@ function BasicsStep({
             valueLabel={form.watch("destinationLabel")}
             placeholder="City or airport code"
             onChange={(airport) => {
-              form.setValue("destinationCode", airport?.code ?? "", { shouldValidate: true });
-              form.setValue("destinationLabel", airport ? airportLabel(airport) : "");
+              form.setValue("destinationCode", airport?.code ?? "", { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+              form.setValue("destinationLabel", airport ? airportLabel(airport) : "", { shouldValidate: true, shouldDirty: true });
             }}
           />
         </Field>

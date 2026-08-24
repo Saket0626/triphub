@@ -23,19 +23,50 @@ export function isLiveViator() {
   return !env.sandboxMode && isViatorConfigured();
 }
 
-type ViatorMoney = { fromPrice?: number; fromPriceBeforeDiscount?: number };
-type ViatorProduct = {
+type ViatorProduct = Record<string, unknown> & {
   productCode?: string;
   title?: string;
   description?: string;
   images?: Array<{ variants?: Array<{ url?: string; width?: number; height?: number }> }>;
   reviews?: { combinedAverageRating?: number; totalReviews?: number };
   duration?: { fixedDurationInMinutes?: number; variableDurationFromMinutes?: number };
-  pricing?: { summary?: ViatorMoney };
+  pricing?: { summary?: { fromPrice?: number; fromPriceBeforeDiscount?: number } };
   flags?: string[];
   productUrl?: string;
   categories?: Array<{ name?: string }>;
 };
+
+const DEST_HINTS: Record<string, { id: string; parentId?: string }> = {
+  HNL: { id: "59070", parentId: "672" },
+  Honolulu: { id: "59070", parentId: "672" },
+  Oahu: { id: "672" },
+};
+
+function rec(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function firstString(value: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const v = value[key];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
+
+function firstNumber(...values: unknown[]) {
+  for (const value of values) {
+    const n = Number(value);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
+}
+
+function priceFromBlob(obj: Record<string, unknown>) {
+  const blob = JSON.stringify(obj);
+  const match = blob.match(/"from[^"]*[Pp]rice":\s*([0-9.]+)/);
+  return match ? Number(match[1]) : 0;
+}
 
 function minutesToLabel(minutes: number) {
   if (!minutes) return "Flexible";
@@ -44,34 +75,51 @@ function minutesToLabel(minutes: number) {
   return Number.isInteger(hours) ? `${hours} hour${hours === 1 ? "" : "s"}` : `${hours.toFixed(1)} hours`;
 }
 
+function productPhoto(product: Record<string, unknown>) {
+  const images = (product.images as Array<Record<string, unknown>> | undefined) ?? (product.images as Array<Record<string, unknown>> | undefined) ?? [];
+  const variants = (images[0]?.variants as Array<Record<string, unknown>> | undefined) ?? (images[0]?.variants as Array<Record<string, unknown>> | undefined) ?? [];
+  const sorted = [...variants].sort((a, b) => Number(b.width ?? 0) - Number(a.width ?? 0));
+  return String(sorted[0]?.url ?? variants[variants.length - 1]?.url ?? "") || undefined;
+}
+
 export function mapViatorProduct(product: ViatorProduct, people: number): ActivityOption {
-  const minutes =
-    Number(product.duration?.fixedDurationInMinutes ?? product.duration?.variableDurationFromMinutes ?? 0) || 0;
-  const price = Math.round(Number(product.pricing?.summary?.fromPrice ?? 0));
-  const listPrice = Math.round(Number(product.pricing?.summary?.fromPriceBeforeDiscount ?? 0));
-  const name = String(product.title ?? "Activity");
-  const photo =
-    product.images?.[0]?.variants?.slice().sort((a, b) => Number(b.width ?? 0) - Number(a.width ?? 0))[0]?.url ??
-    product.images?.[0]?.variants?.slice(-1)[0]?.url;
-  const category = product.categories?.[0]?.name || (product.flags?.includes("SPECIAL_OFFER") ? "Offer" : "Tour");
-  const code = String(product.productCode ?? generateId());
+  const row = rec(product);
+  const pricing = rec(row.pricing);
+  const summary = rec(pricing.summary);
+  const reviews = rec(row.reviews);
+  const duration = rec(row.duration);
+  const flags = (Array.isArray(row.flags) ? row.flags : Array.isArray(product.flags) ? product.flags : []).map(String);
+  const categories = (Array.isArray(row.categories) ? row.categories : product.categories ?? []) as Array<Record<string, unknown>>;
+  const minutes = Math.round(
+    firstNumber(duration.fixedDurationInMinutes, duration.fixedDurationInMinutes, duration.variableDurationFromMinutes, duration.variableDurationFromMinutes)
+  );
+  const price = Math.round(
+    firstNumber(summary.fromPrice, summary.fromPrice, pricing.fromPrice, row.fromPrice, priceFromBlob(summary), priceFromBlob(pricing), priceFromBlob(row))
+  );
+  const listPrice = Math.round(firstNumber(summary.fromPriceBeforeDiscount, summary.fromPriceBeforeDiscount, summary.fromPrice));
+  const name = firstString(row, ["title", "title", "name"]) || "Activity";
+  const code = firstString(row, ["productCode", "productCode", "id"]) || generateId();
+  const url = firstString(row, ["productUrl", "productUrl", "url"]) || (code ? `https://www.viator.com/tours/-/${code}` : undefined);
+  const category = String(categories[0]?.name ?? categories[0]?.name ?? (flags.includes("SPECIAL_OFFER") ? "Offer" : "Tour"));
+  const rating = firstNumber(reviews.combinedAverageRating, reviews.combinedAverageRating, reviews.averageRating) || undefined;
+  const reviewCount = Math.round(firstNumber(reviews.totalReviews, reviews.totalReviews, reviews.reviewCount)) || undefined;
   return {
     id: code,
-    productCode: product.productCode,
-    productUrl: product.productUrl || (product.productCode ? `https://www.viator.com/tours/-/${product.productCode}` : undefined),
+    productCode: code,
+    productUrl: url,
     name,
-    description: String(product.description ?? "").slice(0, 320) || "Live Viator experience for your dates.",
+    description: String(row.description ?? product.description ?? "").slice(0, 320) || "Live Viator experience for your dates.",
     duration: minutesToLabel(minutes),
     durationMinutes: minutes || undefined,
     pricePerPerson: price || 0,
     listPrice: listPrice > price ? listPrice : undefined,
     totalPrice: (price || 0) * people,
     category,
-    photoUrl: photo,
-    rating: product.reviews?.combinedAverageRating,
-    reviewCount: product.reviews?.totalReviews,
-    freeCancellation: product.flags?.includes("FREE_CANCELLATION") || product.flags?.includes("FREE_CANCELLATION"),
-    source: product.productCode?.startsWith("MOCK-") ? "mock" : "viator",
+    photoUrl: productPhoto(row),
+    rating,
+    reviewCount,
+    freeCancellation: flags.includes("FREE_CANCELLATION") || flags.includes("FREE_CANCELLATION"),
+    source: code.startsWith("MOCK-") || code.startsWith("MOCK-") ? "mock" : "viator",
   };
 }
 
@@ -472,7 +520,10 @@ async function viatorHeaders() {
   };
 }
 
-async function lookupDestinationId(city: string): Promise<string | null> {
+type DestRef = { id: string; parentId?: string };
+
+async function lookupDestination(city: string, airportCode?: string): Promise<DestRef | null> {
+  const hinted = DEST_HINTS[airportCode ?? ""] ?? DEST_HINTS[city];
   const res = await fetch(`${VIATOR_BASE}/search/freetext`, {
     method: "POST",
     headers: await viatorHeaders(),
@@ -483,18 +534,42 @@ async function lookupDestinationId(city: string): Promise<string | null> {
       currency: "USD",
     }),
   });
-  if (!res.ok) return null;
-  const json = (await res.json()) as {
-    destinations?:
-      | Array<{ destinationId?: number | string; id?: number | string }>
-      | { results?: Array<{ destinationId?: number | string; id?: number | string }> };
-  };
+  if (!res.ok) return hinted ?? null;
+  const json = (await res.json()) as Record<string, unknown>;
+  const destBlock = rec(json.destinations);
   const rows = Array.isArray(json.destinations)
-    ? json.destinations
-    : json.destinations?.results ?? [];
-  const first = rows[0];
-  const id = first?.destinationId ?? first?.id;
-  return id != null ? String(id) : null;
+    ? (json.destinations as Array<Record<string, unknown>>)
+    : ((destBlock.results as Array<Record<string, unknown>> | undefined) ?? []);
+  const first = rec(rows[0]);
+  const id = first.destinationId ?? first.id ?? first.destinationId;
+  const parentId = first.parentDestinationId ?? first.parentDestinationId ?? first.parentId;
+  if (id == null) return hinted ?? null;
+  return {
+    id: String(id),
+    parentId: parentId != null ? String(parentId) : hinted?.parentId,
+  };
+}
+
+function queryVariants(query?: string) {
+  if (!query) return [];
+  const q = query.toLowerCase();
+  if (/\bscuba\b/.test(q) || (/\b(dive|diving)\b/.test(q) && !/snorkel/.test(q))) {
+    return ["scuba diving", "scuba", "discover scuba", "PADI dive"];
+  }
+  return [query];
+}
+
+function extractProducts(json: Record<string, unknown>): ViatorProduct[] {
+  const products = json.products;
+  if (Array.isArray(products)) return products as ViatorProduct[];
+  const nested = rec(products);
+  if (Array.isArray(nested.results)) return nested.results as ViatorProduct[];
+  return [];
+}
+
+function productKey(product: ViatorProduct) {
+  const row = rec(product);
+  return firstString(row, ["productCode", "productCode", "title", "title", "id"]);
 }
 
 export async function searchViatorActivities(
@@ -513,20 +588,20 @@ export async function searchViatorActivities(
   }
 
   const city = cityName(trip.destinationLabel);
-  const destinationId = await lookupDestinationId(city);
-  if (!destinationId) {
+  const destination = await lookupDestination(city, trip.destinationCode);
+  if (!destination) {
     throw new Error(`Could not find a live Viator destination for ${city}. Try a more specific city name.`);
   }
 
-  const products = await fetchViatorPages(destinationId, trip, query);
+  const products = await fetchViatorPages(destination, trip, query);
   const mapped = dedupeActivities(
     products
       .map((p) => mapViatorProduct(p, people))
       .filter((a) => a.pricePerPerson > 0 && a.source === "viator")
   );
   const ranked = rankAndFilter(mapped, query);
-  if (!query && ranked.length === 0) {
-    throw new Error(`No live tours came back for ${city}. Try nearby dates or another city.`);
+  if (ranked.length === 0) {
+    throw new Error(`No live tours came back for ${city}. Try a broader search or nearby dates.`);
   }
   return { activities: ranked, total: ranked.length, live: true };
 }
@@ -546,15 +621,17 @@ function dedupeActivities(activities: ActivityOption[]) {
   });
 }
 
-async function fetchViatorPages(destinationId: string, trip: Trip, query?: string) {
+async function fetchViatorPages(destination: DestRef, trip: Trip, query?: string) {
   const products: ViatorProduct[] = [];
   const seen = new Set<string>();
+  const destIds = Array.from(new Set([destination.id, destination.parentId].filter(Boolean))) as string[];
+  const variants = queryVariants(query);
 
   async function pull(fetcher: () => Promise<ViatorProduct[]>) {
     try {
       const page = await fetcher();
       for (const product of page) {
-        const key = String(product.productCode ?? product.title ?? "");
+        const key = productKey(product);
         if (!key || seen.has(key)) continue;
         seen.add(key);
         products.push(product);
@@ -565,47 +642,56 @@ async function fetchViatorPages(destinationId: string, trip: Trip, query?: strin
     }
   }
 
-  const starts = query ? [1, 51] : [1, 51, 101];
-  for (const start of starts) {
-    const count = await pull(() =>
-      query
-        ? searchViatorFreetext(query, destinationId, trip, start, 50)
-        : searchViatorCatalog(destinationId, trip, start, 50)
-    );
-    if (count < 50) break;
+  if (variants.length) {
+    for (const destId of destIds) {
+      for (const term of variants) {
+        for (const start of [1, 51]) {
+          const count = await pull(() => searchViatorFreetext(term, destId, trip, start, 50));
+          if (count < 50) break;
+        }
+      }
+    }
   }
 
-  if (query && products.length < 16) {
-    for (const start of [1, 51]) {
-      const count = await pull(() => searchViatorCatalog(destinationId, trip, start, 50));
-      if (count < 50) break;
+  if (!query || products.length < 16) {
+    for (const destId of destIds) {
+      for (const start of query ? [1, 51] : [1, 51, 101]) {
+        const count = await pull(() => searchViatorCatalog(destId, trip, start, 50));
+        if (count < 50) break;
+      }
     }
   }
   return products;
 }
 
 async function searchViatorCatalog(destinationId: string, trip: Trip, start: number, count: number) {
-  const res = await fetch(`${VIATOR_BASE}/products/search`, {
-    method: "POST",
-    headers: await viatorHeaders(),
-    body: JSON.stringify({
+  const dest = Number(destinationId) || destinationId;
+  const bodies = [
+    {
       filtering: {
-        destination: destinationId,
-        startDate: trip.departureDate,
-        endDate: trip.returnDate ?? trip.departureDate,
+        destination: dest,
+        dateRange: { from: trip.departureDate, to: trip.returnDate ?? trip.departureDate },
       },
-      sorting: { sort: "TRAVELER_RATING", order: "DESCENDING" },
-      pagination: { start, count },
-      currency: "USD",
-    }),
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Viator search failed (${res.status}): ${text.slice(0, 240)}`);
+    },
+    { filtering: { destination: dest } },
+  ];
+  for (const extra of bodies) {
+    const res = await fetch(`${VIATOR_BASE}/products/search`, {
+      method: "POST",
+      headers: await viatorHeaders(),
+      body: JSON.stringify({
+        ...extra,
+        sorting: { sort: "TRAVELER_RATING", order: "DESCENDING" },
+        pagination: { start, count },
+        currency: "USD",
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!res.ok) continue;
+    const products = extractProducts(rec(await res.json()));
+    if (products.length) return products;
   }
-  const json = (await res.json()) as { products?: ViatorProduct[]; totalCount?: number };
-  return json.products ?? [];
+  return [];
 }
 
 async function searchViatorFreetext(
@@ -615,30 +701,29 @@ async function searchViatorFreetext(
   start: number,
   count: number
 ) {
-  const res = await fetch(`${VIATOR_BASE}/search/freetext`, {
-    method: "POST",
-    headers: await viatorHeaders(),
-    body: JSON.stringify({
-      searchTerm,
-      productFiltering: {
-        destination: destinationId,
-        dateRange: {
-          from: trip.departureDate,
-          to: trip.returnDate ?? trip.departureDate,
-        },
-      },
-      searchTypes: [{ searchType: "PRODUCTS", pagination: { start, count } }],
-      currency: "USD",
-    }),
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Viator search failed (${res.status}): ${text.slice(0, 240)}`);
+  const dest = Number(destinationId) || destinationId;
+  const filters = [
+    {
+      destination: dest,
+      dateRange: { from: trip.departureDate, to: trip.returnDate ?? trip.departureDate },
+    },
+    { destination: dest },
+  ];
+  for (const productFiltering of filters) {
+    const res = await fetch(`${VIATOR_BASE}/search/freetext`, {
+      method: "POST",
+      headers: await viatorHeaders(),
+      body: JSON.stringify({
+        searchTerm,
+        productFiltering,
+        searchTypes: [{ searchType: "PRODUCTS", pagination: { start, count } }],
+        currency: "USD",
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!res.ok) continue;
+    const products = extractProducts(rec(await res.json()));
+    if (products.length) return products;
   }
-  const json = (await res.json()) as {
-    products?: ViatorProduct[] | { results?: ViatorProduct[]; totalCount?: number };
-  };
-  if (Array.isArray(json.products)) return json.products;
-  return json.products?.results ?? [];
+  return [];
 }

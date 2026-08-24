@@ -83,6 +83,9 @@ export function activityMatchesQuery(activity: ActivityOption, query?: string) {
   if (nameCat.includes(raw)) return true;
   const tokens = raw.split(/\s+/).filter((token) => token.length > 2);
   if (!tokens.length) return true;
+  if (tokens.includes("scuba")) {
+    return nameCat.includes("scuba") || nameCat.includes("padi");
+  }
   const strong = tokens.filter((token) => STRONG_TOKENS.has(token));
   if (strong.length) {
     return strong.every((token) => {

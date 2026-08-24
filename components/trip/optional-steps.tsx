@@ -106,7 +106,7 @@ export function ActivitiesFlow({ bundle }: { bundle: TripBundle }) {
   const router = useRouter();
   const [suggestions, setSuggestions] = useState<ActivityOption[]>([]);
   const [worthKnowing, setWorthKnowing] = useState<ResearchFinding[]>([]);
-  const [sandbox, setSandbox] = useState(true);
+  const [sandbox, setSandbox] = useState(false);
   const [live, setLive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
