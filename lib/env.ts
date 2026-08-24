@@ -5,8 +5,9 @@ function read(name: string, fallback = "") {
 }
 
 export const env = {
-  sandboxMode:
-    read("SANDBOX_MODE", read("NEXT_PUBLIC_SANDBOX_MODE", "true")) !== "false",
+  get sandboxMode() {
+    return read("SANDBOX_MODE", read("NEXT_PUBLIC_SANDBOX_MODE", "true")) !== "false";
+  },
   supabaseUrl: read("NEXT_PUBLIC_SUPABASE_URL"),
   supabaseAnonKey: read("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
   supabaseServiceRoleKey: read("SUPABASE_SERVICE_ROLE_KEY"),

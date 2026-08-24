@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { env } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/brand/mark";
@@ -12,6 +13,7 @@ export function SiteHeader({
   landing?: boolean;
   width?: "desk" | "default";
 }) {
+  headers();
   return (
     <header className="sticky top-0 z-40 border-b border-black/[0.06] bg-white/80 backdrop-blur-xl">
       <div
