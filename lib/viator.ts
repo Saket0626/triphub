@@ -554,7 +554,10 @@ function queryVariants(query?: string) {
   if (!query) return [];
   const q = query.toLowerCase();
   if (/\bscuba\b/.test(q) || (/\b(dive|diving)\b/.test(q) && !/snorkel/.test(q))) {
-    return ["scuba diving", "scuba", "discover scuba", "PADI dive"];
+    return ["scuba diving", "scuba"];
+  }
+  if (/\b(restaurant|food|dining|luau)\b/.test(q)) {
+    return ["food tour", "luau", "food"];
   }
   return [query];
 }
@@ -625,7 +628,7 @@ async function fetchViatorPages(destination: DestRef, trip: Trip, query?: string
   const products: ViatorProduct[] = [];
   const seen = new Set<string>();
   const destIds = Array.from(new Set([destination.id, destination.parentId].filter(Boolean))) as string[];
-  const variants = queryVariants(query).slice(0, 2);
+  const variants = queryVariants(query).slice(0, 3);
 
   async function pull(fetcher: () => Promise<ViatorProduct[]>) {
     try {
@@ -651,15 +654,12 @@ async function fetchViatorPages(destination: DestRef, trip: Trip, query?: string
         jobs.push(() => pull(() => searchViatorFreetext(term, destId, trip, 51, 50)));
       }
     }
-    await Promise.all(jobs.map((job) => job()));
-    if (products.length >= 8) return products;
   }
-
-  const catalogJobs = destIds.flatMap((destId) => [
-    () => pull(() => searchViatorCatalog(destId, trip, 1, 50)),
-    () => pull(() => searchViatorCatalog(destId, trip, 51, 50)),
-  ]);
-  await Promise.all(catalogJobs.map((job) => job()));
+  for (const destId of destIds) {
+    jobs.push(() => pull(() => searchViatorCatalog(destId, trip, 1, 50)));
+    jobs.push(() => pull(() => searchViatorCatalog(destId, trip, 51, 50)));
+  }
+  await Promise.all(jobs.map((job) => job()));
   return products;
 }
 
