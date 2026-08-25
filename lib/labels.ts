@@ -70,6 +70,23 @@ export const AIRLINES = [
   "VivaAerobus",
   "Air Tahiti Nui",
   "Fiji Airways",
+  "Air China",
+  "China Eastern",
+  "China Southern",
+  "Hainan Airlines",
+  "EVA Air",
+  "Asiana",
+  "Scoot",
+  "AirAsia",
+  "Ryanair",
+  "easyJet",
+  "Vueling",
+  "Wizz Air",
+  "Norwegian",
+  "LOT Polish Airlines",
+  "Aegean",
+  "ITA Airways",
+  "Aerolineas Argentinas",
 ] as const;
 
 export const TIME_WINDOWS: { value: TimeWindow; label: string; hours: [number, number] }[] = [
@@ -121,6 +138,10 @@ export const HOTEL_MUST_HAVES = [
   { id: "all_inclusive", label: "All-inclusive" },
   { id: "adults_only", label: "Adults-only" },
   { id: "ev_charger", label: "EV charger" },
+  { id: "accessible", label: "Accessible room" },
+  { id: "quiet", label: "Quiet room" },
+  { id: "late_checkout", label: "Late checkout" },
+  { id: "waterfront", label: "Waterfront" },
 ] as const;
 
 export function minutesToDuration(mins: number) {

@@ -2,7 +2,7 @@
 
 import type { ActivityOption, Trip } from "@/types";
 
-export const ACTIVITY_PAGE_SIZE = 10;
+export const ACTIVITY_PAGE_SIZE = 12;
 
 function durationHours(activity: ActivityOption) {
   if (activity.durationMinutes && activity.durationMinutes > 0) {
@@ -81,6 +81,12 @@ const QUERY_ALIASES: Record<string, string[]> = {
   cooking: ["cooking", "cook", "class"],
   bike: ["bike", "biking", "cycling"],
   balloon: ["balloon", "hot air"],
+  safari: ["safari", "wildlife", "game drive"],
+  temple: ["temple", "shrine", "pagoda"],
+  castle: ["castle", "palace", "fort"],
+  island: ["island", "islands"],
+  theme: ["theme park", "amusement"],
+  park: ["park", "theme park"],
 };
 
 const STRONG_TOKENS = new Set(["scuba", "diving", "dive", "snorkel", "snorkeling"]);

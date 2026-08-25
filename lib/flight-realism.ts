@@ -70,7 +70,7 @@ export function collapseFlights(flights: FlightOption[]) {
   const collapsed: FlightOption[] = [];
   Array.from(groups.values()).forEach((list) => {
     list.sort((a, b) => a.totalPrice - b.totalPrice);
-    collapsed.push(...list.slice(0, 4));
+    collapsed.push(...list.slice(0, 6));
   });
   return collapsed;
 }

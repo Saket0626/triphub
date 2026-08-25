@@ -15,6 +15,12 @@ import { addCalendarDays, formatDate, nightsBetween } from "@/lib/utils";
 import { updateTripDates } from "@/lib/db";
 import type { FlightOption, Trip, TripPreferences } from "@/types";
 
+export type DateSuggestion = {
+  departureDate: string;
+  returnDate: string | null;
+  flightCount: number;
+};
+
 export type FlightSearchResult = {
   flights: FlightOption[];
   departureDate: string;
@@ -23,19 +29,44 @@ export type FlightSearchResult = {
   originalDepartureDate: string;
   originalReturnDate: string | null;
   dateReason: string | null;
+  dateSuggestions: DateSuggestion[];
 };
 
-export async function searchFlights(trip: Trip, prefs: TripPreferences): Promise<FlightSearchResult> {
+function emptySuggestions(departureDate: string, returnDate: string | null, flightCount: number): DateSuggestion[] {
+  return [{ departureDate, returnDate, flightCount }];
+}
+
+export async function searchFlights(
+  trip: Trip,
+  prefs: TripPreferences,
+  opts?: { exactDates?: boolean }
+): Promise<FlightSearchResult> {
   if (env.sandboxMode) {
     await new Promise((r) => setTimeout(r, 900));
+    const flights = generateMockFlights(trip, prefs);
     return {
-      flights: generateMockFlights(trip, prefs),
+      flights,
       departureDate: trip.departureDate,
       returnDate: trip.returnDate,
       dateAdjusted: false,
       originalDepartureDate: trip.departureDate,
       originalReturnDate: trip.returnDate,
       dateReason: null,
+      dateSuggestions: emptySuggestions(trip.departureDate, trip.returnDate, flights.length),
+    };
+  }
+
+  if (opts?.exactDates) {
+    const flights = await searchDuffel(trip, prefs);
+    return {
+      flights,
+      departureDate: trip.departureDate,
+      returnDate: trip.returnDate,
+      dateAdjusted: false,
+      originalDepartureDate: trip.departureDate,
+      originalReturnDate: trip.returnDate,
+      dateReason: null,
+      dateSuggestions: emptySuggestions(trip.departureDate, trip.returnDate, flights.length),
     };
   }
 
@@ -49,13 +80,18 @@ function dateWindows(trip: Trip) {
     departureDate: addCalendarDays(trip.departureDate, offset),
     returnDate: trip.returnDate ? addCalendarDays(trip.departureDate, offset + nights) : null,
   });
-  return [[make(0)], [make(1), make(-1)], [make(2), make(-2)], [make(3), make(7)], [make(14), make(-3)]];
+  return [[make(0)], [make(1), make(-1)], [make(2), make(-2)], [make(3), make(4), make(7)], [make(14), make(-3), make(10)]];
+}
+
+function rankWindows<T extends { window: { offset: number } }>(rows: T[]) {
+  return [...rows].sort((a, b) => Math.abs(a.window.offset) - Math.abs(b.window.offset) || b.window.offset - a.window.offset);
 }
 
 async function searchDuffelWithDateFallback(trip: Trip, prefs: TripPreferences): Promise<FlightSearchResult> {
   const originalDepartureDate = trip.departureDate;
   const originalReturnDate = trip.returnDate;
   let lastError = "Duffel did not return real airline offers for this route.";
+  const suggestions: DateSuggestion[] = [];
 
   for (const batch of dateWindows(trip)) {
     const results = await Promise.all(
@@ -76,12 +112,24 @@ async function searchDuffelWithDateFallback(trip: Trip, prefs: TripPreferences):
         }
       })
     );
-    const hit = results.find((row) => row.flights.length);
+    const hits = rankWindows(results.filter((row) => row.flights.length));
+    for (const row of hits) {
+      if (!suggestions.some((s) => s.departureDate === row.window.departureDate && s.returnDate === row.window.returnDate)) {
+        suggestions.push({
+          departureDate: row.window.departureDate,
+          returnDate: row.window.returnDate,
+          flightCount: row.flights.length,
+        });
+      }
+    }
+    const hit = hits[0];
     if (hit) {
       const dateAdjusted = hit.window.offset !== 0;
       if (dateAdjusted) {
         await updateTripDates(trip.id, hit.window.departureDate, hit.window.returnDate);
       }
+      const orig = `${formatDate(originalDepartureDate)}${originalReturnDate ? `–${formatDate(originalReturnDate)}` : ""}`;
+      const next = `${formatDate(hit.window.departureDate)}${hit.window.returnDate ? `–${formatDate(hit.window.returnDate)}` : ""}`;
       return {
         flights: hit.flights,
         departureDate: hit.window.departureDate,
@@ -90,12 +138,9 @@ async function searchDuffelWithDateFallback(trip: Trip, prefs: TripPreferences):
         originalDepartureDate,
         originalReturnDate,
         dateReason: dateAdjusted
-          ? `No real flights on ${formatDate(originalDepartureDate)}${
-              originalReturnDate ? `–${formatDate(originalReturnDate)}` : ""
-            }. Showing ${formatDate(hit.window.departureDate)}${
-              hit.window.returnDate ? `–${formatDate(hit.window.returnDate)}` : ""
-            } instead.`
+          ? `No real flights on ${orig}. Suggested dates: ${next}. Showing those flights below.`
           : null,
+        dateSuggestions: suggestions,
       };
     }
     lastError = results.map((row) => row.error).find(Boolean) ?? lastError;
@@ -175,7 +220,7 @@ async function searchDuffel(trip: Trip, prefs: TripPreferences): Promise<FlightO
       return true;
     })
     .sort((a, b) => b.score - a.score);
-  const collapsed = collapseFlights(mapped).slice(0, 64);
+  const collapsed = collapseFlights(mapped).slice(0, 80);
   if (!collapsed.length) {
     throw new Error("Duffel did not return real airline offers for this route.");
   }

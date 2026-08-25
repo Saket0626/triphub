@@ -74,6 +74,22 @@ export function generateGroundOptions(trip: Trip): GroundOption[] {
       priceEstimate: 85,
       details: "Per hour, 3-hour minimum. Useful if you have multiple stops after landing.",
     },
+    {
+      id: "train_pass",
+      kind: "public_transit",
+      title: "City transit day pass",
+      description: "Unlimited metro/bus for the first day after you land.",
+      priceEstimate: 18,
+      details: "Buy at the airport transit desk or tap-in gates. Covers most city buses and trains.",
+    },
+    {
+      id: "ferry",
+      kind: "public_transit",
+      title: "Airport ferry or water taxi",
+      description: "Waterfront cities only — skip road traffic into the center.",
+      priceEstimate: 24,
+      details: "One way. Typical ride 20–40 minutes. Check the airport's ferry signs after baggage claim.",
+    },
   ];
 }
 

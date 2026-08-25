@@ -17,7 +17,7 @@ const CARRIERS = [
   { name: "Lufthansa", code: "LH" },
 ] as const;
 
-const LAYOVER_HUBS = ["ATL", "ORD", "DFW", "DEN", "CLT", "PHX", "MSP"];
+const LAYOVER_HUBS = ["ATL", "ORD", "DFW", "DEN", "CLT", "PHX", "MSP", "AMS", "FRA", "DOH", "DXB", "IST", "SIN", "NRT", "LHR"];
 
 function pad(n: number) {
   return n.toString().padStart(2, "0");
@@ -155,6 +155,10 @@ export function generateMockFlights(trip: Trip, prefs: TripPreferences): FlightO
     { carrier: CARRIERS[7], hour: 12, minute: 40, duration: 470, stops: 1, priceJitter: -20, flightNum: 780 },
     { carrier: CARRIERS[8], hour: 14, minute: 55, duration: 520, stops: 1, priceJitter: 55, flightNum: 112 },
     { carrier: CARRIERS[9], hour: 18, minute: 5, duration: 365, stops: 0, priceJitter: 35, flightNum: 441 },
+    { carrier: CARRIERS[1], hour: 4, minute: 40, duration: 505, stops: 1, priceJitter: -15, flightNum: 219 },
+    { carrier: CARRIERS[2], hour: 20, minute: 35, duration: 290, stops: 0, priceJitter: 60, flightNum: 1488 },
+    { carrier: CARRIERS[4], hour: 22, minute: 15, duration: 580, stops: 1, priceJitter: -70, flightNum: 66 },
+    { carrier: CARRIERS[5], hour: 12, minute: 5, duration: 340, stops: 0, priceJitter: 12, flightNum: 1902 },
   ];
 
   const options = templates.map((t, index) => {

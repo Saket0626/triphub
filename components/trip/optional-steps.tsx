@@ -52,6 +52,13 @@ const ACTIVITY_CHIPS = [
   "cooking class",
   "bike tour",
   "hot air balloon",
+  "safari",
+  "city pass",
+  "skip the line",
+  "island tour",
+  "temple",
+  "castle",
+  "theme park",
 ];
 
 export function GroundFlow({ bundle }: { bundle: TripBundle }) {

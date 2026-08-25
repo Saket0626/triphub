@@ -17,51 +17,83 @@ import { SectionHeader } from "@/components/wizard/progress";
 import { PointsCompare } from "@/components/trip/points-compare";
 
 type SortKey = "best" | "price" | "duration" | "stops" | "departure" | "airline";
+type DateSuggestion = { departureDate: string; returnDate: string | null; flightCount: number };
+
+function dateLabel(departureDate: string, returnDate: string | null) {
+  return `${formatDate(departureDate)}${returnDate ? ` – ${formatDate(returnDate)}` : ""}`;
+}
 
 export function FlightSearch({ bundle }: { bundle: TripBundle }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [flights, setFlights] = useState<FlightOption[]>([]);
-  const [dateNote, setDateNote] = useState<string | null>(null);
+  const [dateAdjusted, setDateAdjusted] = useState(false);
+  const [originalDates, setOriginalDates] = useState({
+    departureDate: bundle.trip.departureDate,
+    returnDate: bundle.trip.returnDate,
+  });
   const [shownDates, setShownDates] = useState({
     departureDate: bundle.trip.departureDate,
     returnDate: bundle.trip.returnDate,
   });
+  const [suggestions, setSuggestions] = useState<DateSuggestion[]>([]);
   const [sort, setSort] = useState<SortKey>("best");
   const [stopFilter, setStopFilter] = useState<"all" | "0" | "1" | "2">("all");
   const [airlineFilter, setAirlineFilter] = useState("all");
   const [selected, setSelected] = useState<FlightOption | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function run() {
-      setLoading(true);
-      try {
-        const res = await fetch("/api/flights/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tripId: bundle.trip.id }),
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || "Search failed");
-        if (!cancelled) {
-          setFlights(json.flights ?? []);
-          setDateNote(json.dateReason ?? null);
-          if (json.departureDate) {
-            setShownDates({ departureDate: json.departureDate, returnDate: json.returnDate ?? null });
-          }
+  async function load(dates?: { departureDate: string; returnDate: string | null }, signal?: AbortSignal) {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/flights/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tripId: bundle.trip.id,
+          ...(dates ? { departureDate: dates.departureDate, returnDate: dates.returnDate } : {}),
+        }),
+        signal,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Search failed");
+      if (signal?.aborted) return;
+      setFlights(json.flights ?? []);
+      if (dates) {
+        setDateAdjusted(true);
+      } else if (json.dateAdjusted) {
+        setDateAdjusted(true);
+        if (json.originalDepartureDate) {
+          setOriginalDates({
+            departureDate: json.originalDepartureDate,
+            returnDate: json.originalReturnDate ?? null,
+          });
         }
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Search failed");
-      } finally {
-        if (!cancelled) setLoading(false);
       }
+      if (json.departureDate) {
+        setShownDates({ departureDate: json.departureDate, returnDate: json.returnDate ?? null });
+      }
+      if (Array.isArray(json.dateSuggestions) && json.dateSuggestions.length) {
+        setSuggestions((prev) => {
+          const next = dates ? prev : json.dateSuggestions;
+          return next;
+        });
+      }
+    } catch (err) {
+      if (signal?.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
+      setError(err instanceof Error ? err.message : "Search failed");
+    } finally {
+      setLoading(false);
     }
-    run();
-    return () => {
-      cancelled = true;
-    };
+  }
+
+  useEffect(() => {
+    const ac = new AbortController();
+    void load(undefined, ac.signal);
+    return () => ac.abort();
+    // First search only; later date chips call load() directly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bundle.trip.id]);
 
   const airlines = useMemo(() => Array.from(new Set(flights.map((f) => f.airline))), [flights]);
@@ -95,7 +127,7 @@ export function FlightSearch({ bundle }: { bundle: TripBundle }) {
           {bundle.trip.departureCode} → {bundle.trip.destinationCode} · {formatDate(shownDates.departureDate)}
           {shownDates.returnDate ? ` – ${formatDate(shownDates.returnDate)}` : ""}
         </p>
-        <p className="mt-2 text-xs text-muted-foreground">If this date is thin, we’ll automatically try nearby days.</p>
+        <p className="mt-2 text-xs text-muted-foreground">If this date is thin, we’ll suggest nearby days and show those flights.</p>
       </div>
     );
   }
@@ -108,21 +140,46 @@ export function FlightSearch({ bundle }: { bundle: TripBundle }) {
     <div className="animate-fade-up">
       <SectionHeader
         eyebrow="Flights"
-        title="Pick a flight"
-        description={`${bundle.trip.departureCode} → ${bundle.trip.destinationCode} · ${formatDate(shownDates.departureDate)}${
-          shownDates.returnDate ? ` – ${formatDate(shownDates.returnDate)}` : ""
-        }. Sorted by what you asked for. Nothing's held until you confirm.`}
+        title={dateAdjusted ? "Suggested dates" : "Pick a flight"}
+        description={
+          dateAdjusted
+            ? `No real flights on ${dateLabel(originalDates.departureDate, originalDates.returnDate)}. Showing flights for ${dateLabel(shownDates.departureDate, shownDates.returnDate)}.`
+            : `${bundle.trip.departureCode} → ${bundle.trip.destinationCode} · ${dateLabel(shownDates.departureDate, shownDates.returnDate)}. Sorted by what you asked for. Nothing's held until you confirm.`
+        }
       />
-      {dateNote ? (
-        <div className="mb-6 rounded-2xl border border-channel/30 bg-channel/5 px-4 py-3 text-sm">
-          <p className="font-medium text-soundings">We moved the dates so you still have real flights</p>
-          <p className="mt-1 text-muted-foreground">{dateNote}</p>
-          <p className="mt-1 text-muted-foreground">
-            Hotels and activities will use {formatDate(shownDates.departureDate)}
-            {shownDates.returnDate ? `–${formatDate(shownDates.returnDate)}` : ""}.
+      {dateAdjusted ? (
+        <div className="mb-6 rounded-2xl border border-channel/30 bg-channel/5 px-5 py-4">
+          <p className="text-sm font-medium text-channel">Suggested dates</p>
+          <p className="mt-1 font-serif text-2xl text-soundings">{dateLabel(shownDates.departureDate, shownDates.returnDate)}</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Nothing matched {dateLabel(originalDates.departureDate, originalDates.returnDate)}. Hotels and activities will use these suggested dates. The flights below are for this itinerary.
           </p>
+          {suggestions.length > 1 ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {suggestions.map((suggestion) => {
+                const active =
+                  suggestion.departureDate === shownDates.departureDate && suggestion.returnDate === shownDates.returnDate;
+                return (
+                  <button
+                    key={`${suggestion.departureDate}-${suggestion.returnDate ?? "ow"}`}
+                    type="button"
+                    onClick={() => void load(suggestion)}
+                    className={`rounded-full border px-3 py-1.5 text-sm ${
+                      active ? "border-channel bg-white font-medium text-soundings" : "border-black/10 bg-white/60 text-muted-foreground"
+                    }`}
+                  >
+                    {dateLabel(suggestion.departureDate, suggestion.returnDate)}
+                    {suggestion.flightCount ? ` · ${suggestion.flightCount}` : ""}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       ) : null}
+      <h2 className="mb-4 text-lg font-medium">
+        {dateAdjusted ? `Flights for ${dateLabel(shownDates.departureDate, shownDates.returnDate)}` : "Available flights"}
+      </h2>
       <div className="mb-6 flex flex-wrap gap-3">
         <select className="h-10 rounded-full border bg-white px-3 text-sm" value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
           <option value="best">Best match</option>
