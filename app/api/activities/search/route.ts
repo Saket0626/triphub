@@ -37,7 +37,7 @@ export async function POST(request: Request) {
         research = await runDestinationResearch(bundle.trip);
         await saveCachedResearch(bundle.trip, cacheKey, research);
       } catch {
-        research = undefined;
+        research = null;
       }
     }
     const usable = research && research.source !== "mock" ? research : null;
