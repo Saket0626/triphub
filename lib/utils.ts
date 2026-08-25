@@ -32,6 +32,12 @@ export function nightsBetween(start: string, end?: string | null) {
   return Math.max(1, diff);
 }
 
+export function addCalendarDays(iso: string, days: number) {
+  const [year, month, day] = iso.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return date.toISOString().slice(0, 10);
+}
+
 export function travelerCount(adults: number, children: number) {
   return adults + children;
 }

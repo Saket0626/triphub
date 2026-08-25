@@ -39,6 +39,19 @@ const ACTIVITY_CHIPS = [
   "sunset cruise",
   "day trip",
   "museum",
+  "walking tour",
+  "hiking",
+  "beach",
+  "spa",
+  "nightlife",
+  "wine tasting",
+  "helicopter",
+  "kayak",
+  "wildlife",
+  "photography",
+  "cooking class",
+  "bike tour",
+  "hot air balloon",
 ];
 
 export function GroundFlow({ bundle }: { bundle: TripBundle }) {

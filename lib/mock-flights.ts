@@ -11,6 +11,10 @@ const CARRIERS = [
   { name: "JetBlue", code: "B6" },
   { name: "Alaska", code: "AS" },
   { name: "Southwest", code: "WN" },
+  { name: "Hawaiian", code: "HA" },
+  { name: "Air Canada", code: "AC" },
+  { name: "British Airways", code: "BA" },
+  { name: "Lufthansa", code: "LH" },
 ] as const;
 
 const LAYOVER_HUBS = ["ATL", "ORD", "DFW", "DEN", "CLT", "PHX", "MSP"];
@@ -147,6 +151,10 @@ export function generateMockFlights(trip: Trip, prefs: TripPreferences): FlightO
     { carrier: CARRIERS[3], hour: 19, minute: 15, duration: 620, stops: 2, priceJitter: -110, flightNum: 55 },
     { carrier: CARRIERS[4], hour: 5, minute: 50, duration: 300, stops: 0, priceJitter: 90, flightNum: 333 },
     { carrier: CARRIERS[0], hour: 16, minute: 10, duration: 335, stops: 0, priceJitter: 5, flightNum: 1776 },
+    { carrier: CARRIERS[6], hour: 10, minute: 25, duration: 348, stops: 0, priceJitter: 25, flightNum: 205 },
+    { carrier: CARRIERS[7], hour: 12, minute: 40, duration: 470, stops: 1, priceJitter: -20, flightNum: 780 },
+    { carrier: CARRIERS[8], hour: 14, minute: 55, duration: 520, stops: 1, priceJitter: 55, flightNum: 112 },
+    { carrier: CARRIERS[9], hour: 18, minute: 5, duration: 365, stops: 0, priceJitter: 35, flightNum: 441 },
   ];
 
   const options = templates.map((t, index) => {

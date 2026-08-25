@@ -34,7 +34,7 @@ export function AirportAutocomplete({
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const results = useMemo(() => searchAirports(query), [query]);
+  const results = useMemo(() => searchAirports(query, 24), [query]);
 
   return (
     <div ref={box} className="relative">
@@ -53,13 +53,13 @@ export function AirportAutocomplete({
           }
           const typed = next.trim().toUpperCase();
           if (/^[A-Z]{3}$/.test(typed)) {
-            const hit = searchAirports(typed, 8).find((airport) => airport.code === typed);
+            const hit = searchAirports(typed, 24).find((airport) => airport.code === typed);
             if (hit) onChange(hit);
           }
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => {
-          const exact = searchAirports(query, 8).find(
+          const exact = searchAirports(query, 24).find(
             (airport) =>
               airport.code.toLowerCase() === query.trim().toLowerCase() ||
               airport.city.toLowerCase() === query.trim().toLowerCase()
@@ -71,7 +71,7 @@ export function AirportAutocomplete({
         }}
       />
       {open ? (
-        <ul className="absolute z-50 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-border bg-white p-1 shadow-lg">
+        <ul className="absolute z-50 mt-1 max-h-80 w-full overflow-auto rounded-xl border border-border bg-white p-1 shadow-lg">
           {results.length === 0 ? (
             <li className="px-3 py-2 text-sm text-muted-foreground">No airports match that search.</li>
           ) : (

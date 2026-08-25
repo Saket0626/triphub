@@ -68,8 +68,8 @@ async function searchLiteApi(trip: Trip, prefs: HotelPreferences): Promise<Hotel
       },
     ],
     timeout: 8,
-    maxRatesPerHotel: 1,
-    limit: 9,
+    maxRatesPerHotel: 3,
+    limit: 36,
     includeHotelData: true,
   };
   if (prefs.starRating !== "no_preference") {

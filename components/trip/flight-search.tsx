@@ -23,6 +23,11 @@ export function FlightSearch({ bundle }: { bundle: TripBundle }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [flights, setFlights] = useState<FlightOption[]>([]);
+  const [dateNote, setDateNote] = useState<string | null>(null);
+  const [shownDates, setShownDates] = useState({
+    departureDate: bundle.trip.departureDate,
+    returnDate: bundle.trip.returnDate,
+  });
   const [sort, setSort] = useState<SortKey>("best");
   const [stopFilter, setStopFilter] = useState<"all" | "0" | "1" | "2">("all");
   const [airlineFilter, setAirlineFilter] = useState("all");
@@ -40,7 +45,13 @@ export function FlightSearch({ bundle }: { bundle: TripBundle }) {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Search failed");
-        if (!cancelled) setFlights(json.flights);
+        if (!cancelled) {
+          setFlights(json.flights ?? []);
+          setDateNote(json.dateReason ?? null);
+          if (json.departureDate) {
+            setShownDates({ departureDate: json.departureDate, returnDate: json.returnDate ?? null });
+          }
+        }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Search failed");
       } finally {
@@ -81,8 +92,10 @@ export function FlightSearch({ bundle }: { bundle: TripBundle }) {
         <p className="text-sm font-medium text-channel">One sec</p>
         <h1 className="mt-3 text-3xl font-semibold">Looking at flights for you…</h1>
         <p className="mt-3 text-muted-foreground">
-          {bundle.trip.departureCode} → {bundle.trip.destinationCode} · {formatDate(bundle.trip.departureDate)}
+          {bundle.trip.departureCode} → {bundle.trip.destinationCode} · {formatDate(shownDates.departureDate)}
+          {shownDates.returnDate ? ` – ${formatDate(shownDates.returnDate)}` : ""}
         </p>
+        <p className="mt-2 text-xs text-muted-foreground">If this date is thin, we’ll automatically try nearby days.</p>
       </div>
     );
   }
@@ -96,8 +109,20 @@ export function FlightSearch({ bundle }: { bundle: TripBundle }) {
       <SectionHeader
         eyebrow="Flights"
         title="Pick a flight"
-        description="Sorted by what you asked for. Nothing's held until you confirm."
+        description={`${bundle.trip.departureCode} → ${bundle.trip.destinationCode} · ${formatDate(shownDates.departureDate)}${
+          shownDates.returnDate ? ` – ${formatDate(shownDates.returnDate)}` : ""
+        }. Sorted by what you asked for. Nothing's held until you confirm.`}
       />
+      {dateNote ? (
+        <div className="mb-6 rounded-2xl border border-channel/30 bg-channel/5 px-4 py-3 text-sm">
+          <p className="font-medium text-soundings">We moved the dates so you still have real flights</p>
+          <p className="mt-1 text-muted-foreground">{dateNote}</p>
+          <p className="mt-1 text-muted-foreground">
+            Hotels and activities will use {formatDate(shownDates.departureDate)}
+            {shownDates.returnDate ? `–${formatDate(shownDates.returnDate)}` : ""}.
+          </p>
+        </div>
+      ) : null}
       <div className="mb-6 flex flex-wrap gap-3">
         <select className="h-10 rounded-full border bg-white px-3 text-sm" value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
           <option value="best">Best match</option>
@@ -125,7 +150,7 @@ export function FlightSearch({ bundle }: { bundle: TripBundle }) {
       <div className="grid gap-4">
         {visible.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-black/10 px-5 py-8 text-sm text-muted-foreground">
-            No flights came back for those dates and airports. Go back and try different dates, or a nearby airport.
+            No real flights on these dates. We also checked nearby days. Try another airport, or a different week.
           </p>
         ) : null}
         {visible.map((flight, i) => (

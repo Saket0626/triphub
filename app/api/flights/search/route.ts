@@ -6,7 +6,7 @@ import { getTripBundle } from "@/lib/db";
 import { searchFlights } from "@/lib/flights";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const bodySchema = z.object({ tripId: z.string().min(1) });
 
@@ -17,8 +17,8 @@ export async function POST(request: Request) {
     if (!bundle?.preferences) {
       return NextResponse.json({ error: "Trip or flight preferences not found" }, { status: 404 });
     }
-    const flights = await searchFlights(bundle.trip, bundle.preferences);
-    return NextResponse.json({ flights });
+    const result = await searchFlights(bundle.trip, bundle.preferences);
+    return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Search failed";
     return NextResponse.json({ error: message }, { status: 400 });

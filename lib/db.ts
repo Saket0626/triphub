@@ -411,6 +411,26 @@ export async function getTripBundle(tripId: string): Promise<TripBundle | null> 
   return assembleBundleFromLocal(await readStore(), tripId);
 }
 
+export async function updateTripDates(tripId: string, departureDate: string, returnDate: string | null) {
+  const sb = serverSupabase();
+  if (sb) {
+    const { error } = await sb
+      .from("trips")
+      .update({ departure_date: departureDate, return_date: returnDate, updated_at: nowIso() })
+      .eq("id", tripId);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  const store = await readStore();
+  const trip = store.trips.find((t) => t.id === tripId);
+  if (trip) {
+    trip.departureDate = departureDate;
+    trip.returnDate = returnDate;
+    trip.updatedAt = nowIso();
+    await writeStore(store);
+  }
+}
+
 export async function updateTripStatus(tripId: string, status: TripStatus) {
   const sb = serverSupabase();
   if (sb) {

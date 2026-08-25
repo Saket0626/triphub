@@ -91,6 +91,41 @@ export function generateMockHotels(trip: Trip, prefs: HotelPreferences): HotelOp
       price: 390,
       amenities: ["breakfast", "spa", "city_center", "pool", "free_cancellation"],
     },
+    {
+      name: `${city} Beach Club`,
+      stars: 4,
+      neighborhood: "Coast",
+      price: 275,
+      amenities: ["beach", "pool", "wifi", "parking", "free_cancellation"],
+    },
+    {
+      name: `Kitchen Lofts ${city}`,
+      stars: 3,
+      neighborhood: "Residential",
+      price: 189,
+      amenities: ["kitchen", "wifi", "parking", "family_friendly", "free_cancellation"],
+    },
+    {
+      name: `${city} Airport Gateway`,
+      stars: 3,
+      neighborhood: "Airport",
+      price: 132,
+      amenities: ["airport_shuttle", "wifi", "parking", "gym", "free_cancellation"],
+    },
+    {
+      name: `Skyline Rooftop ${city}`,
+      stars: 4,
+      neighborhood: "Downtown",
+      price: 298,
+      amenities: ["rooftop", "pool", "wifi", "city_center", "spa"],
+    },
+    {
+      name: `Palm All-Inclusive ${city}`,
+      stars: 5,
+      neighborhood: "Resort",
+      price: 445,
+      amenities: ["all_inclusive", "beach", "pool", "spa", "adults_only"],
+    },
   ];
 
   return templates.map((t, i) => {

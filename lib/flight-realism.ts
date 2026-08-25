@@ -1,5 +1,6 @@
 /** Drop Duffel-test itineraries that reuse well-known flight numbers on the wrong city pair. */
 
+import { isUsAirport } from "@/lib/airports";
 import type { FlightOption, Trip } from "@/types";
 
 const KNOWN_ROUTES: Record<string, Array<{ from: string; to: string }>> = {
@@ -12,13 +13,6 @@ const KNOWN_ROUTES: Record<string, Array<{ from: string; to: string }>> = {
   CM812: [{ from: "JFK", to: "PTY" }],
   CM811: [{ from: "PTY", to: "JFK" }],
 };
-
-const US_AIRPORTS = new Set([
-  "JFK", "EWR", "LGA", "BOS", "PHL", "DCA", "IAD", "BWI",
-  "ORD", "MDW", "DTW", "MSP", "ATL", "CLT", "MIA", "FLL", "MCO", "TPA",
-  "DFW", "IAH", "AUS", "DEN", "PHX", "LAS", "LAX", "SFO", "SJC", "SAN",
-  "SEA", "PDX", "HNL", "OGG", "KOA", "LIH", "ANC", "RDU", "BNA", "MSY",
-]);
 
 /** Carriers that do not operate US-to-US scheduled service as the marketing airline. */
 const NOT_US_DOMESTIC = new Set([
@@ -54,8 +48,8 @@ export function isImplausibleFlight(flight: FlightOption, trip: Trip) {
   const airline = flight.airlineCode.toUpperCase();
   if (
     NOT_US_DOMESTIC.has(airline) &&
-    US_AIRPORTS.has(flight.from) &&
-    US_AIRPORTS.has(flight.to)
+    isUsAirport(flight.from) &&
+    isUsAirport(flight.to)
   ) {
     return true;
   }
@@ -76,7 +70,7 @@ export function collapseFlights(flights: FlightOption[]) {
   const collapsed: FlightOption[] = [];
   Array.from(groups.values()).forEach((list) => {
     list.sort((a, b) => a.totalPrice - b.totalPrice);
-    collapsed.push(...list.slice(0, 2));
+    collapsed.push(...list.slice(0, 4));
   });
   return collapsed;
 }

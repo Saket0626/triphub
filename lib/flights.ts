@@ -11,15 +11,97 @@
 import { env } from "@/lib/env";
 import { generateMockFlights } from "@/lib/mock-flights";
 import { collapseFlights, isImplausibleFlight } from "@/lib/flight-realism";
+import { addCalendarDays, formatDate, nightsBetween } from "@/lib/utils";
+import { updateTripDates } from "@/lib/db";
 import type { FlightOption, Trip, TripPreferences } from "@/types";
 
-export async function searchFlights(trip: Trip, prefs: TripPreferences): Promise<FlightOption[]> {
+export type FlightSearchResult = {
+  flights: FlightOption[];
+  departureDate: string;
+  returnDate: string | null;
+  dateAdjusted: boolean;
+  originalDepartureDate: string;
+  originalReturnDate: string | null;
+  dateReason: string | null;
+};
+
+export async function searchFlights(trip: Trip, prefs: TripPreferences): Promise<FlightSearchResult> {
   if (env.sandboxMode) {
     await new Promise((r) => setTimeout(r, 900));
-    return generateMockFlights(trip, prefs);
+    return {
+      flights: generateMockFlights(trip, prefs),
+      departureDate: trip.departureDate,
+      returnDate: trip.returnDate,
+      dateAdjusted: false,
+      originalDepartureDate: trip.departureDate,
+      originalReturnDate: trip.returnDate,
+      dateReason: null,
+    };
   }
 
-  return searchDuffel(trip, prefs);
+  return searchDuffelWithDateFallback(trip, prefs);
+}
+
+function dateWindows(trip: Trip) {
+  const nights = trip.returnDate ? nightsBetween(trip.departureDate, trip.returnDate) : 0;
+  const make = (offset: number) => ({
+    offset,
+    departureDate: addCalendarDays(trip.departureDate, offset),
+    returnDate: trip.returnDate ? addCalendarDays(trip.departureDate, offset + nights) : null,
+  });
+  return [[make(0)], [make(1), make(-1)], [make(2), make(-2)], [make(3), make(7)], [make(14), make(-3)]];
+}
+
+async function searchDuffelWithDateFallback(trip: Trip, prefs: TripPreferences): Promise<FlightSearchResult> {
+  const originalDepartureDate = trip.departureDate;
+  const originalReturnDate = trip.returnDate;
+  let lastError = "Duffel did not return real airline offers for this route.";
+
+  for (const batch of dateWindows(trip)) {
+    const results = await Promise.all(
+      batch.map(async (window) => {
+        const shifted: Trip = {
+          ...trip,
+          departureDate: window.departureDate,
+          returnDate: window.returnDate,
+        };
+        try {
+          return { window, flights: await searchDuffel(shifted, prefs), error: null as string | null };
+        } catch (error) {
+          return {
+            window,
+            flights: [] as FlightOption[],
+            error: error instanceof Error ? error.message : lastError,
+          };
+        }
+      })
+    );
+    const hit = results.find((row) => row.flights.length);
+    if (hit) {
+      const dateAdjusted = hit.window.offset !== 0;
+      if (dateAdjusted) {
+        await updateTripDates(trip.id, hit.window.departureDate, hit.window.returnDate);
+      }
+      return {
+        flights: hit.flights,
+        departureDate: hit.window.departureDate,
+        returnDate: hit.window.returnDate,
+        dateAdjusted,
+        originalDepartureDate,
+        originalReturnDate,
+        dateReason: dateAdjusted
+          ? `No real flights on ${formatDate(originalDepartureDate)}${
+              originalReturnDate ? `–${formatDate(originalReturnDate)}` : ""
+            }. Showing ${formatDate(hit.window.departureDate)}${
+              hit.window.returnDate ? `–${formatDate(hit.window.returnDate)}` : ""
+            } instead.`
+          : null,
+      };
+    }
+    lastError = results.map((row) => row.error).find(Boolean) ?? lastError;
+  }
+
+  throw new Error(`${lastError} Nearby dates were searched too.`);
 }
 
 async function searchDuffel(trip: Trip, prefs: TripPreferences): Promise<FlightOption[]> {
@@ -93,9 +175,9 @@ async function searchDuffel(trip: Trip, prefs: TripPreferences): Promise<FlightO
       return true;
     })
     .sort((a, b) => b.score - a.score);
-  const collapsed = collapseFlights(mapped).slice(0, 24);
+  const collapsed = collapseFlights(mapped).slice(0, 64);
   if (!collapsed.length) {
-    throw new Error("Duffel did not return real airline offers for this route. Try different dates or nearby airports.");
+    throw new Error("Duffel did not return real airline offers for this route.");
   }
   return collapsed;
 }
