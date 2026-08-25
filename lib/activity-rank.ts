@@ -51,12 +51,61 @@ export function activityValueReason(activity: ActivityOption) {
   return bits.join(" · ");
 }
 
-export function rankActivities(activities: ActivityOption[]): ActivityOption[] {
+const QUERY_ALIASES: Record<string, string[]> = {
+  scuba: ["scuba", "dive", "diving", "padi"],
+  diving: ["diving", "dive", "scuba"],
+  dive: ["dive", "diving", "scuba"],
+  snorkel: ["snorkel", "snorkeling"],
+  snorkeling: ["snorkeling", "snorkel"],
+  restaurant: ["restaurant", "dining", "dinner", "luau", "food", "culinary", "tasting"],
+  restaurants: ["restaurant", "dining", "dinner", "luau", "food", "culinary", "tasting"],
+  food: ["food", "culinary", "tasting", "foodie", "gastro", "dining", "restaurant", "luau"],
+  dining: ["dining", "dinner", "restaurant", "luau", "food", "culinary"],
+  luau: ["luau", "feast"],
+  tour: ["tour", "walk", "walking", "guided", "crawl"],
+  sunset: ["sunset", "golden hour", "sail", "cruise"],
+  cruise: ["cruise", "sail", "boat", "catamaran"],
+  museum: ["museum", "gallery", "culture", "skip-the-line"],
+  spa: ["spa", "massage", "wellness"],
+  hike: ["hike", "hiking", "trail", "waterfall"],
+  hiking: ["hike", "hiking", "trail", "waterfall"],
+};
+
+const STRONG_TOKENS = new Set(["scuba", "diving", "dive", "snorkel", "snorkeling"]);
+const GENERIC_TOKENS = new Set(["tour", "tours", "trip", "experience", "activity"]);
+
+function normalizeToken(token: string) {
+  if (QUERY_ALIASES[token]) return token;
+  if (token.endsWith("s") && QUERY_ALIASES[token.slice(0, -1)]) return token.slice(0, -1);
+  return token;
+}
+
+function fieldHits(field: string, token: string) {
+  const aliases = QUERY_ALIASES[token] ?? [token];
+  return aliases.some((alias) => field.includes(alias));
+}
+
+function queryRelevance(activity: ActivityOption, query?: string) {
+  const raw = query?.trim().toLowerCase().replace(/[-_]+/g, " ");
+  if (!raw) return 1;
+  const name = activity.name.toLowerCase();
+  if (name.includes(raw)) return 1.7;
+  const tokens = raw.split(/\s+/).filter((token) => token.length > 2).map(normalizeToken);
+  if (!tokens.length) return 1;
+  const distinctive = tokens.filter((token) => !GENERIC_TOKENS.has(token));
+  const needed = distinctive.length ? distinctive : tokens;
+  const hits = needed.filter((token) => fieldHits(name, token)).length;
+  if (hits === needed.length) return 1.35;
+  if (hits > 0) return 1.12;
+  return 1;
+}
+
+export function rankActivities(activities: ActivityOption[], query?: string): ActivityOption[] {
   const typical = typicalPrice(activities);
   return [...activities]
     .map((activity) => ({
       ...activity,
-      valueScore: activityValueScore(activity, typical),
+      valueScore: activityValueScore(activity, typical) * queryRelevance(activity, query),
       valueReason: activityValueReason(activity),
     }))
     .sort((a, b) => {
@@ -82,40 +131,12 @@ export function paginateActivities(activities: ActivityOption[], page: number, p
   };
 }
 
-const QUERY_ALIASES: Record<string, string[]> = {
-  scuba: ["scuba", "dive", "diving", "padi"],
-  diving: ["diving", "dive", "scuba"],
-  dive: ["dive", "diving", "scuba"],
-  snorkel: ["snorkel", "snorkeling"],
-  snorkeling: ["snorkeling", "snorkel"],
-  restaurant: ["restaurant", "dining", "dinner", "lunch", "luau", "food", "culinary", "tasting"],
-  restaurants: ["restaurant", "dining", "dinner", "lunch", "luau", "food", "culinary", "tasting"],
-  food: ["food", "culinary", "tasting", "foodie", "gastro", "dining", "restaurant", "luau", "eat"],
-  dining: ["dining", "dinner", "restaurant", "luau", "food", "culinary"],
-  luau: ["luau", "dinner", "feast", "show"],
-  tour: ["tour", "walk", "walking", "guided"],
-  sunset: ["sunset", "golden hour", "sail", "cruise"],
-  cruise: ["cruise", "sail", "boat", "catamaran"],
-  museum: ["museum", "gallery", "culture", "skip-the-line"],
-  spa: ["spa", "massage", "wellness"],
-  hike: ["hike", "hiking", "trail", "waterfall"],
-  hiking: ["hike", "hiking", "trail", "waterfall"],
-};
-
-const STRONG_TOKENS = new Set(["scuba", "diving", "dive", "snorkel", "snorkeling"]);
-
-function normalizeToken(token: string) {
-  if (QUERY_ALIASES[token]) return token;
-  if (token.endsWith("s") && QUERY_ALIASES[token.slice(0, -1)]) return token.slice(0, -1);
-  return token;
-}
-
 export function activityMatchesQuery(activity: ActivityOption, query?: string) {
   const raw = query?.trim().toLowerCase().replace(/[-_]+/g, " ");
   if (!raw) return true;
-  const nameCat = `${activity.name} ${activity.category}`.toLowerCase();
-  const hay = `${nameCat} ${activity.description}`.toLowerCase();
-  if (nameCat.includes(raw) || hay.includes(raw)) return true;
+  const name = activity.name.toLowerCase();
+  const nameCat = `${name} ${activity.category}`.toLowerCase();
+  if (name.includes(raw) || nameCat.includes(raw)) return true;
   const tokens = raw.split(/\s+/).filter((token) => token.length > 2).map(normalizeToken);
   if (!tokens.length) return true;
   if (tokens.includes("scuba")) {
@@ -123,13 +144,13 @@ export function activityMatchesQuery(activity: ActivityOption, query?: string) {
   }
   const strong = tokens.filter((token) => STRONG_TOKENS.has(token));
   if (strong.length) {
-    return strong.every((token) => {
-      const aliases = QUERY_ALIASES[token] ?? [token];
-      return aliases.some((alias) => nameCat.includes(alias));
-    });
+    return strong.every((token) => fieldHits(nameCat, token));
   }
-  return tokens.every((token) => {
-    const aliases = QUERY_ALIASES[token] ?? [token];
-    return aliases.some((alias) => hay.includes(alias));
-  });
+  const distinctive = tokens.filter((token) => !GENERIC_TOKENS.has(token));
+  const generic = tokens.filter((token) => GENERIC_TOKENS.has(token));
+  if (distinctive.length && generic.length) {
+    return distinctive.every((token) => fieldHits(name, token)) && generic.every((token) => fieldHits(name, token));
+  }
+  const needed = distinctive.length ? distinctive : tokens;
+  return needed.every((token) => fieldHits(nameCat, token));
 }

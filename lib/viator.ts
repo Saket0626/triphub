@@ -608,7 +608,7 @@ export async function searchViatorActivities(
 
 function rankAndFilter(activities: ActivityOption[], query?: string) {
   const filtered = query ? activities.filter((activity) => activityMatchesQuery(activity, query)) : activities;
-  return rankActivities(filtered);
+  return rankActivities(filtered, query);
 }
 
 function dedupeActivities(activities: ActivityOption[]) {

@@ -15,7 +15,7 @@ export async function searchActivities(
 }> {
   const { activities, total, live } = await searchViatorActivities(trip, { query, start: 1, count: 50 });
   return {
-    activities: rankActivities(activities),
+    activities: rankActivities(activities, query),
     inventorySource: live ? "viator" : "mock",
     live,
     total,
