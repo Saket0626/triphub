@@ -50,7 +50,11 @@ export const AIRPORTS: Airport[] = [
   { code: "RSW", city: "Fort Myers", name: "Southwest Florida International", country: "USA" },
   { code: "PBI", city: "West Palm Beach", name: "Palm Beach International", country: "USA" },
   { code: "ANC", city: "Anchorage", name: "Ted Stevens Anchorage International", country: "USA" },
-  { code: "ABQ", city: "Albuquerque", name: "Albuquerque International Sunport", country: "USA" },
+  { code: "OGG", city: "Kahului", name: "Kahului Airport (Maui)", country: "USA" },
+  { code: "KOA", city: "Kona", name: "Ellison Onizuka Kona International", country: "USA" },
+  { code: "LIH", city: "Lihue", name: "Lihue Airport (Kauai)", country: "USA" },
+  { code: "SJU", city: "San Juan", name: "Luis Muñoz Marín International", country: "USA" },
+  { code: "CUN", city: "Cancun", name: "Cancún International", country: "Mexico" },
 ];
 
 export function airportLabel(airport: Airport) {

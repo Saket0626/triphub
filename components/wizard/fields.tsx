@@ -44,9 +44,18 @@ export function AirportAutocomplete({
         placeholder={placeholder}
         value={query}
         onChange={(e) => {
-          setQuery(e.target.value);
+          const next = e.target.value;
+          setQuery(next);
           setOpen(true);
-          if (!e.target.value) onChange(null);
+          if (!next) {
+            onChange(null);
+            return;
+          }
+          const typed = next.trim().toUpperCase();
+          if (/^[A-Z]{3}$/.test(typed)) {
+            const hit = searchAirports(typed, 8).find((airport) => airport.code === typed);
+            if (hit) onChange(hit);
+          }
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => {
@@ -62,7 +71,7 @@ export function AirportAutocomplete({
         }}
       />
       {open ? (
-        <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-border bg-white p-1 shadow-lg">
+        <ul className="absolute z-50 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-border bg-white p-1 shadow-lg">
           {results.length === 0 ? (
             <li className="px-3 py-2 text-sm text-muted-foreground">No airports match that search.</li>
           ) : (
@@ -71,6 +80,7 @@ export function AirportAutocomplete({
                 <button
                   type="button"
                   className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-secondary focus-visible:bg-secondary"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     onChange(airport);
                     setQuery(airportLabel(airport));

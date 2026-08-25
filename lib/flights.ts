@@ -94,7 +94,7 @@ async function searchDuffel(trip: Trip, prefs: TripPreferences): Promise<FlightO
     })
     .sort((a, b) => b.score - a.score);
   const collapsed = collapseFlights(mapped).slice(0, 24);
-  if (!mapped.length) {
+  if (!collapsed.length) {
     throw new Error("Duffel did not return real airline offers for this route. Try different dates or nearby airports.");
   }
   return collapsed;

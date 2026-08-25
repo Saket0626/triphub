@@ -66,8 +66,8 @@ export function IntakeWizard() {
     maxStops: "no_preference",
     outboundTimeWindow: "no_preference",
     returnTimeWindow: "no_preference",
-    budgetMin: 150,
-    budgetMax: 800,
+    budgetMin: 200,
+    budgetMax: 1800,
     seatPreference: "no_preference",
     specialAssistance: "",
   });
@@ -209,6 +209,11 @@ function BasicsStep({
         title="Where are you going?"
         description="City, dates, the usual. We'll search after you look this over at the end."
       />
+      {form.formState.isSubmitted && !form.formState.isValid ? (
+        <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          Pick departure and destination from the airport list, then set your dates.
+        </p>
+      ) : null}
       <div className="grid gap-6">
         <Field label="Departure city / airport" error={form.formState.errors.departureCode?.message}>
           <AirportAutocomplete
@@ -552,8 +557,8 @@ function PrefsStep({
       maxStops: value.maxStops ?? "no_preference",
       outboundTimeWindow: value.outboundTimeWindow ?? "no_preference",
       returnTimeWindow: value.returnTimeWindow ?? "no_preference",
-      budgetMin: value.budgetMin ?? 150,
-      budgetMax: value.budgetMax ?? 800,
+      budgetMin: value.budgetMin ?? 200,
+      budgetMax: value.budgetMax ?? 1800,
       seatPreference: value.seatPreference ?? "no_preference",
       specialAssistance: value.specialAssistance ?? "",
     },

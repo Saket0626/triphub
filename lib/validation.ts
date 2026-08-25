@@ -53,7 +53,16 @@ export const tripBasicsSchema = z
 
 export const travelerSchema = z.object({
   fullName: z.string().min(2, "Enter the name as it appears on ID"),
-  dateOfBirth: z.string().min(1, "Date of birth is required"),
+  dateOfBirth: z
+    .string()
+    .min(1, "Date of birth is required")
+    .refine((value) => {
+      const born = new Date(`${value}T00:00:00`);
+      if (Number.isNaN(born.getTime())) return false;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return born < today && born.getFullYear() > 1900;
+    }, "Enter a real date of birth"),
   type: z.enum(["adult", "child"]),
   age: z.number().int().min(0).max(17).nullable(),
   loyaltyProgram: z.string().optional(),

@@ -5,7 +5,27 @@ import type { FlightOption, Trip } from "@/types";
 const KNOWN_ROUTES: Record<string, Array<{ from: string; to: string }>> = {
   AA107: [{ from: "LHR", to: "JFK" }],
   AA106: [{ from: "JFK", to: "LHR" }],
+  BA105: [{ from: "LHR", to: "DXB" }],
+  BA104: [{ from: "DXB", to: "LHR" }],
+  BA107: [{ from: "LHR", to: "JFK" }],
+  BA106: [{ from: "JFK", to: "LHR" }],
+  CM812: [{ from: "JFK", to: "PTY" }],
+  CM811: [{ from: "PTY", to: "JFK" }],
 };
+
+const US_AIRPORTS = new Set([
+  "JFK", "EWR", "LGA", "BOS", "PHL", "DCA", "IAD", "BWI",
+  "ORD", "MDW", "DTW", "MSP", "ATL", "CLT", "MIA", "FLL", "MCO", "TPA",
+  "DFW", "IAH", "AUS", "DEN", "PHX", "LAS", "LAX", "SFO", "SJC", "SAN",
+  "SEA", "PDX", "HNL", "OGG", "KOA", "LIH", "ANC", "RDU", "BNA", "MSY",
+]);
+
+/** Carriers that do not operate US-to-US scheduled service as the marketing airline. */
+const NOT_US_DOMESTIC = new Set([
+  "BA", "LH", "AF", "KL", "EK", "QR", "EY", "SQ", "CX", "TK", "EI", "IB", "AY",
+  "VS", "LX", "OS", "SK", "AZ", "TP", "JL", "NH", "KE", "OZ",
+  "CM", "AV", "LA", "AM", "AR", "G3", "H2", "JJ",
+]);
 
 const MIN_NONSTOP: Record<string, number> = {
   JFKHNL: 540,
@@ -31,6 +51,14 @@ export function isImplausibleFlight(flight: FlightOption, trip: Trip) {
     return true;
   }
   if (flight.from !== trip.departureCode || flight.to !== trip.destinationCode) return true;
+  const airline = flight.airlineCode.toUpperCase();
+  if (
+    NOT_US_DOMESTIC.has(airline) &&
+    US_AIRPORTS.has(flight.from) &&
+    US_AIRPORTS.has(flight.to)
+  ) {
+    return true;
+  }
   const pair = `${flight.from}${flight.to}`;
   const min = MIN_NONSTOP[pair];
   if (min && flight.stops === 0 && flight.durationMinutes < min) return true;

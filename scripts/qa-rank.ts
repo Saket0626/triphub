@@ -1,5 +1,5 @@
 import { mockViatorProducts, mapViatorProduct } from "../lib/viator";
-import { activityMatchesQuery, paginateActivities, rankActivities } from "../lib/activity-rank";
+import { activityFitsDestination, activityMatchesQuery, isLowValueFiller, paginateActivities, rankActivities } from "../lib/activity-rank";
 import type { Trip } from "../types";
 
 const trip: Trip = {
@@ -89,6 +89,21 @@ if (cheapStar.findIndex((a) => a.id === "cheap-poor") < cheapStar.findIndex((a) 
 
 const food = all.filter((a) => activityMatchesQuery(a, "restaurants"));
 if (food.length < 1) problems.push("restaurants search should match food/dining tours");
+
+const sdTour = {
+  id: "sd",
+  name: "Historical Walking Tour of San Diego",
+  description: "Old Town",
+  duration: "2 hours",
+  pricePerPerson: 15,
+  totalPrice: 30,
+  category: "Tour",
+  productUrl: "https://www.viator.com/tours/San-Diego/Historical-Walking-Tour/d732-x",
+};
+if (activityFitsDestination(sdTour, trip)) problems.push("San Diego tour should not match Honolulu");
+if (!isLowValueFiller({ ...sdTour, name: "Seattle: Luggage Storage close to Lower Queen Anne", productUrl: undefined })) {
+  problems.push("luggage storage should be treated as filler");
+}
 
 console.log(
   JSON.stringify(

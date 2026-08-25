@@ -1,6 +1,6 @@
 /** Rank live activities by best overall deal: high ratings, real extras, cheap as a high priority. */
 
-import type { ActivityOption } from "@/types";
+import type { ActivityOption, Trip } from "@/types";
 
 export const ACTIVITY_PAGE_SIZE = 8;
 
@@ -25,8 +25,8 @@ export function activityValueScore(activity: ActivityOption, typical = 100) {
   const price = Math.max(activity.pricePerPerson, 1);
   const rating = activity.rating ?? 3.8;
   const reviewCount = activity.reviewCount ?? 8;
-  const reviews = Math.log10(reviewCount + 10);
-  const reviewTrust = reviewCount < 10 ? 0.3 : reviewCount < 40 ? 0.6 : reviewCount < 150 ? 0.85 : 1;
+  const reviews = Math.pow(Math.log10(reviewCount + 10), 1.45);
+  const reviewTrust = reviewCount < 20 ? 0.35 : reviewCount < 50 ? 0.55 : reviewCount < 150 ? 0.8 : 1;
   const extras =
     1 +
     0.07 * Math.min(activity.inclusions?.length ?? 0, 8) +
@@ -100,12 +100,88 @@ function queryRelevance(activity: ActivityOption, query?: string) {
   return 1;
 }
 
+const DEST_TOUR_SLUGS: Record<string, string[]> = {
+  HNL: ["honolulu", "oahu", "waikiki"],
+  OGG: ["maui", "kahului", "lahaina", "kihei"],
+  KOA: ["big-island", "kona", "hilo", "hawaii-island"],
+  LAX: ["los-angeles", "hollywood", "santa-monica", "anaheim", "long-beach", "burbank"],
+  SAN: ["san-diego", "la-jolla"],
+  SFO: ["san-francisco", "napa", "napa-valley", "sausalito", "oakland"],
+  SEA: ["seattle"],
+  LAS: ["las-vegas", "vegas"],
+  JFK: ["new-york-city", "new-york", "manhattan", "brooklyn"],
+  EWR: ["new-york-city", "new-york", "manhattan", "brooklyn"],
+  LGA: ["new-york-city", "new-york", "manhattan", "brooklyn"],
+  MIA: ["miami", "miami-beach", "south-beach"],
+  FLL: ["fort-lauderdale", "miami", "miami-beach"],
+  MCO: ["orlando", "kissimmee", "universal-orlando"],
+  CUN: ["cancun", "isla-mujeres", "playa-del-carmen", "tulum", "cozumel", "riviera-maya"],
+  SJU: ["san-juan", "puerto-rico"],
+  BOS: ["boston", "cambridge"],
+  ORD: ["chicago"],
+  MDW: ["chicago"],
+  DFW: ["dallas", "fort-worth"],
+  ATL: ["atlanta"],
+  DEN: ["denver", "boulder"],
+  PHX: ["phoenix", "scottsdale"],
+  AUS: ["austin"],
+  PDX: ["portland"],
+  IAD: ["washington-dc", "washington", "arlington"],
+  DCA: ["washington-dc", "washington", "arlington"],
+  CLT: ["charlotte"],
+  DTW: ["detroit"],
+  MSP: ["minneapolis"],
+};
+
+const SLUG_OWNERS = (() => {
+  const map = new Map<string, string[]>();
+  for (const [code, slugs] of Object.entries(DEST_TOUR_SLUGS)) {
+    for (const slug of slugs) {
+      const list = map.get(slug) ?? [];
+      list.push(code);
+      map.set(slug, list);
+    }
+  }
+  return map;
+})();
+
+function tourSlug(url?: string) {
+  if (!url) return "";
+  const match = url.match(/\/tours\/([^/]+)/i);
+  return decodeURIComponent(match?.[1] ?? "").toLowerCase();
+}
+
+export function isLowValueFiller(activity: ActivityOption) {
+  const name = activity.name.toLowerCase();
+  return /luggage storage|bag storage|bike rental|e-bike rental|ebike rental|scooter rental|sim card|portable wifi|airport transfer|hotel to airport|airport to hotel|private transfer/.test(
+    name
+  );
+}
+
+export function activityFitsDestination(activity: ActivityOption, trip: Pick<Trip, "destinationCode" | "destinationLabel">) {
+  const slug = tourSlug(activity.productUrl);
+  if (slug) {
+    const owners = SLUG_OWNERS.get(slug);
+    if (owners) return owners.includes(trip.destinationCode);
+  }
+  const blob = `${activity.name} ${activity.description}`.toLowerCase();
+  const ours = (DEST_TOUR_SLUGS[trip.destinationCode] ?? []).map((s) => s.replace(/-/g, " "));
+  for (const [code, slugs] of Object.entries(DEST_TOUR_SLUGS)) {
+    if (code === trip.destinationCode) continue;
+    const foreign = slugs.map((s) => s.replace(/-/g, " ")).filter((s) => s.length > 5);
+    if (foreign.some((name) => blob.includes(name)) && !ours.some((name) => blob.includes(name))) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function rankActivities(activities: ActivityOption[], query?: string): ActivityOption[] {
   const typical = typicalPrice(activities);
   return [...activities]
     .map((activity) => ({
       ...activity,
-      valueScore: activityValueScore(activity, typical) * queryRelevance(activity, query),
+      valueScore: activityValueScore(activity, typical) * queryRelevance(activity, query) * (isLowValueFiller(activity) ? 0.12 : 1),
       valueReason: activityValueReason(activity),
     }))
     .sort((a, b) => {

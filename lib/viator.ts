@@ -9,7 +9,7 @@
 
 import { env, isPlaceholder } from "@/lib/env";
 import { generateId } from "@/lib/utils";
-import { activityMatchesQuery, rankActivities } from "@/lib/activity-rank";
+import { activityFitsDestination, activityMatchesQuery, isLowValueFiller, rankActivities } from "@/lib/activity-rank";
 import type { ActivityOption, Trip } from "@/types";
 
 const VIATOR_BASE = process.env.VIATOR_API_BASE || "https://api.viator.com/partner";
@@ -40,6 +40,53 @@ const DEST_HINTS: Record<string, { id: string; parentId?: string }> = {
   HNL: { id: "59070", parentId: "672" },
   Honolulu: { id: "59070", parentId: "672" },
   Oahu: { id: "672" },
+  OGG: { id: "671" },
+  Maui: { id: "671" },
+  KOA: { id: "653" },
+  LAX: { id: "645" },
+  "Los Angeles": { id: "645" },
+  SFO: { id: "673" },
+  "San Francisco": { id: "673" },
+  SAN: { id: "732" },
+  "San Diego": { id: "732" },
+  LAS: { id: "684" },
+  "Las Vegas": { id: "684" },
+  SEA: { id: "704" },
+  Seattle: { id: "704" },
+  JFK: { id: "687" },
+  EWR: { id: "687" },
+  LGA: { id: "687" },
+  "New York": { id: "687" },
+  MIA: { id: "662" },
+  Miami: { id: "662" },
+  MCO: { id: "663" },
+  Orlando: { id: "663" },
+  FLL: { id: "662" },
+  CUN: { id: "631" },
+  Cancun: { id: "631" },
+  SJU: { id: "489" },
+  BOS: { id: "481" },
+  Boston: { id: "481" },
+  ORD: { id: "610" },
+  MDW: { id: "610" },
+  Chicago: { id: "610" },
+  DFW: { id: "357" },
+  Dallas: { id: "357" },
+  ATL: { id: "317" },
+  Atlanta: { id: "317" },
+  DEN: { id: "347" },
+  Denver: { id: "347" },
+  PHX: { id: "557" },
+  Phoenix: { id: "557" },
+  AUS: { id: "320" },
+  Austin: { id: "320" },
+  PDX: { id: "737" },
+  Portland: { id: "737" },
+  IAD: { id: "739" },
+  DCA: { id: "739" },
+  CLT: { id: "615" },
+  DTW: { id: "623" },
+  MSP: { id: "701" },
 };
 
 function rec(value: unknown): Record<string, unknown> {
@@ -524,6 +571,7 @@ type DestRef = { id: string; parentId?: string };
 
 async function lookupDestination(city: string, airportCode?: string): Promise<DestRef | null> {
   const hinted = DEST_HINTS[airportCode ?? ""] ?? DEST_HINTS[city];
+  if (hinted) return hinted;
   const res = await fetch(`${VIATOR_BASE}/search/freetext`, {
     method: "POST",
     headers: await viatorHeaders(),
@@ -534,20 +582,22 @@ async function lookupDestination(city: string, airportCode?: string): Promise<De
       currency: "USD",
     }),
   });
-  if (!res.ok) return hinted ?? null;
+  if (!res.ok) return null;
   const json = (await res.json()) as Record<string, unknown>;
   const destBlock = rec(json.destinations);
   const rows = Array.isArray(json.destinations)
     ? (json.destinations as Array<Record<string, unknown>>)
     : ((destBlock.results as Array<Record<string, unknown>> | undefined) ?? []);
-  const first = rec(rows[0]);
-  const id = first.destinationId ?? first.id ?? first.destinationId;
-  const parentId = first.parentDestinationId ?? first.parentDestinationId ?? first.parentId;
-  if (id == null) return hinted ?? null;
-  return {
-    id: String(id),
-    parentId: parentId != null ? String(parentId) : hinted?.parentId,
-  };
+  const needle = city.toLowerCase().split(",")[0]?.trim() ?? "";
+  const match =
+    rows.find((row) => {
+      const name = String(rec(row).destinationName ?? rec(row).name ?? rec(row).title ?? "").toLowerCase();
+      return needle.length > 2 && name.includes(needle);
+    }) ?? rows[0];
+  const picked = rec(match);
+  const id = picked.destinationId ?? picked.id;
+  if (id == null) return null;
+  return { id: String(id) };
 }
 
 function queryVariants(query?: string) {
@@ -585,7 +635,8 @@ export async function searchViatorActivities(
   if (!isLiveViator()) {
     const ranked = rankAndFilter(
       mockViatorProducts(trip).map((p) => mapViatorProduct(p, people)),
-      query
+      query,
+      trip
     );
     return { activities: ranked, total: ranked.length, live: false };
   }
@@ -602,16 +653,19 @@ export async function searchViatorActivities(
       .map((p) => mapViatorProduct(p, people))
       .filter((a) => a.pricePerPerson > 0 && a.source === "viator")
   );
-  const ranked = rankAndFilter(mapped, query);
+  const ranked = rankAndFilter(mapped, query, trip);
   if (ranked.length === 0) {
     throw new Error(`No live tours came back for ${city}. Try a broader search or nearby dates.`);
   }
   return { activities: ranked, total: ranked.length, live: true };
 }
 
-function rankAndFilter(activities: ActivityOption[], query?: string) {
-  const filtered = query ? activities.filter((activity) => activityMatchesQuery(activity, query)) : activities;
-  return rankActivities(filtered, query);
+function rankAndFilter(activities: ActivityOption[], query: string | undefined, trip: Trip) {
+  const inDest = activities.filter((activity) => activityFitsDestination(activity, trip));
+  const matched = query
+    ? inDest.filter((activity) => activityMatchesQuery(activity, query))
+    : inDest.filter((activity) => !isLowValueFiller(activity));
+  return rankActivities(matched, query);
 }
 
 function dedupeActivities(activities: ActivityOption[]) {

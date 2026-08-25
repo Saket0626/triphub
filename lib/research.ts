@@ -72,6 +72,17 @@ type AnthropicBlock = {
   citations?: Array<{ url?: string; title?: string }>;
 };
 
+function emptyLiveResearch(): DestinationResearch {
+  return {
+    source: "anthropic",
+    fetchedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    deals: [],
+    events: [],
+    localFavorites: [],
+  };
+}
+
 export async function runDestinationResearch(trip: Trip): Promise<DestinationResearch> {
   if (!isLiveResearch()) {
     return mockDestinationResearch(trip);
@@ -112,7 +123,7 @@ export async function runDestinationResearch(trip: Trip): Promise<DestinationRes
     });
 
     if (!res.ok) {
-      return mockDestinationResearch(trip);
+      return emptyLiveResearch();
     }
 
     const json = (await res.json()) as { content?: AnthropicBlock[] };
@@ -125,7 +136,7 @@ export async function runDestinationResearch(trip: Trip): Promise<DestinationRes
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     if (!parsed) {
-      return mockDestinationResearch(trip);
+      return emptyLiveResearch();
     }
 
     return {
@@ -138,6 +149,6 @@ export async function runDestinationResearch(trip: Trip): Promise<DestinationRes
     };
   } catch (error) {
     console.error("Destination research failed", error);
-    return mockDestinationResearch(trip);
+    return emptyLiveResearch();
   }
 }

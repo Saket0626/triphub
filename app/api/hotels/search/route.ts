@@ -27,16 +27,17 @@ export async function POST(request: Request) {
       getCachedResearch(cacheKey),
     ]);
     const research = cached ?? (await runDestinationResearch(bundle.trip));
-    if (!cached) await saveCachedResearch(bundle.trip, cacheKey, research);
+    if (!cached && research.source !== "mock") await saveCachedResearch(bundle.trip, cacheKey, research);
 
-    const withInsights = attachHotelInsights(hotels, research);
+    const usable = research.source === "mock" ? null : research;
+    const withInsights = usable ? attachHotelInsights(hotels, usable) : hotels;
     const used = withInsights.flatMap((h) => h.liveInsights ?? []);
     return NextResponse.json({
       hotels: withInsights,
-      worthKnowing: unmatchedFindings(research, used),
-      research,
+      worthKnowing: usable ? unmatchedFindings(usable, used) : [],
+      research: usable,
       inventorySource: env.sandboxMode ? "mock" : "liteapi",
-      researchSource: research.source,
+      researchSource: usable?.source ?? null,
       sandbox: env.sandboxMode,
     });
   } catch (error) {
