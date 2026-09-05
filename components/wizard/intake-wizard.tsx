@@ -109,15 +109,33 @@ export function IntakeWizard() {
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/trips", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Could not save trip");
-      sessionStorage.removeItem(STORAGE_KEY);
-      router.push(`/trip/${json.id}/flights`);
+      let lastError = "Could not save trip";
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const res = await fetch("/api/trips", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const text = await res.text();
+          let json: { id?: string; error?: string } = {};
+          try {
+            json = text ? (JSON.parse(text) as { id?: string; error?: string }) : {};
+          } catch {
+            throw new Error("Could not save trip. Try confirming again.");
+          }
+          if (!res.ok) throw new Error(json.error || "Could not save trip");
+          if (!json.id) throw new Error("Could not save trip");
+          sessionStorage.removeItem(STORAGE_KEY);
+          router.push(`/trip/${json.id}/flights`);
+          return;
+        } catch (err) {
+          lastError = err instanceof Error ? err.message : "Could not save trip";
+          if (attempt === 2) break;
+          await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
+        }
+      }
+      throw new Error(lastError);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Could not save trip");
       setSaving(false);

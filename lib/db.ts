@@ -86,6 +86,35 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function isNetworkFailure(error: unknown) {
+  const msg = error instanceof Error ? `${error.name} ${error.message}` : String(error);
+  const cause = error instanceof Error && "cause" in error ? String((error as Error & { cause?: unknown }).cause ?? "") : "";
+  return /fetch failed|Failed to fetch|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|undici|socket|network|521|Web server is down|<!DOCTYPE/i.test(
+    `${msg} ${cause}`
+  );
+}
+
+function friendlyDbError(error: unknown) {
+  if (isNetworkFailure(error)) {
+    return new Error("Could not reach the trip database. It may be waking up — wait a few seconds and confirm again.");
+  }
+  return error instanceof Error ? error : new Error("Could not save trip");
+}
+
+async function withDbRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      last = error;
+      if (!isNetworkFailure(error) || i === attempts - 1) throw friendlyDbError(error);
+      await new Promise((r) => setTimeout(r, 900 * (i + 1)));
+    }
+  }
+  throw friendlyDbError(last);
+}
+
 function mapTripRow(row: Record<string, unknown>): Trip {
   return {
     id: row.id as string,
@@ -234,73 +263,75 @@ export async function createTripFromIntake(input: IntakeConfirmInput): Promise<T
 
   const sb = serverSupabase();
   if (sb) {
-    const { error: tripError } = await sb.from("trips").insert({
-      id: trip.id,
-      status: trip.status,
-      trip_type: trip.tripType,
-      departure_code: trip.departureCode,
-      departure_label: trip.departureLabel,
-      destination_code: trip.destinationCode,
-      destination_label: trip.destinationLabel,
-      additional_cities: trip.additionalCities,
-      departure_date: trip.departureDate,
-      return_date: trip.returnDate,
-      flexible_dates: trip.flexibleDates,
-      flexible_days: trip.flexibleDays,
-      trip_purpose: trip.tripPurpose,
-      contact_email: trip.contactEmail,
-      adult_count: trip.adultCount,
-      child_count: trip.childCount,
-    });
-    if (tripError) throw new Error(tripError.message);
+    await withDbRetry(async () => {
+      const { error: tripError } = await sb.from("trips").insert({
+        id: trip.id,
+        status: trip.status,
+        trip_type: trip.tripType,
+        departure_code: trip.departureCode,
+        departure_label: trip.departureLabel,
+        destination_code: trip.destinationCode,
+        destination_label: trip.destinationLabel,
+        additional_cities: trip.additionalCities,
+        departure_date: trip.departureDate,
+        return_date: trip.returnDate,
+        flexible_dates: trip.flexibleDates,
+        flexible_days: trip.flexibleDays,
+        trip_purpose: trip.tripPurpose,
+        contact_email: trip.contactEmail,
+        adult_count: trip.adultCount,
+        child_count: trip.childCount,
+      });
+      if (tripError) throw new Error(tripError.message);
 
-    const { error: travelerError } = await sb.from("travelers").insert(
-      travelers.map((t) => ({
-        id: t.id,
-        trip_id: t.tripId,
-        full_name: t.fullName,
-        date_of_birth: t.dateOfBirth,
-        type: t.type,
-        age: t.age,
-        loyalty_program: t.loyaltyProgram,
-        loyalty_number: t.loyaltyNumber,
-        sort_order: t.sortOrder,
-      }))
-    );
-    if (travelerError) throw new Error(travelerError.message);
-
-    const { error: prefError } = await sb.from("trip_preferences").insert({
-      id: preferences.id,
-      trip_id: preferences.tripId,
-      cabin_class: preferences.cabinClass,
-      preferred_airlines: preferences.preferredAirlines,
-      no_airline_preference: preferences.noAirlinePreference,
-      max_stops: preferences.maxStops,
-      outbound_time_window: preferences.outboundTimeWindow,
-      return_time_window: preferences.returnTimeWindow,
-      budget_min: preferences.budgetMin,
-      budget_max: preferences.budgetMax,
-      seat_preference: preferences.seatPreference,
-      special_assistance: preferences.specialAssistance,
-    });
-    if (prefError) throw new Error(prefError.message);
-
-    if (wallets.length) {
-      const { error: walletError } = await sb.from("loyalty_wallets").insert(
-        wallets.map((w) => ({
-          id: w.id,
-          trip_id: w.tripId,
-          program_id: w.programId,
-          program_label: w.programLabel,
-          kind: w.kind,
-          member_number: w.memberNumber,
-          balance: w.balance,
+      const { error: travelerError } = await sb.from("travelers").insert(
+        travelers.map((t) => ({
+          id: t.id,
+          trip_id: t.tripId,
+          full_name: t.fullName,
+          date_of_birth: t.dateOfBirth,
+          type: t.type,
+          age: t.age,
+          loyalty_program: t.loyaltyProgram,
+          loyalty_number: t.loyaltyNumber,
+          sort_order: t.sortOrder,
         }))
       );
-      if (walletError && !/loyalty_wallets/i.test(walletError.message)) {
-        throw new Error(walletError.message);
+      if (travelerError) throw new Error(travelerError.message);
+
+      const { error: prefError } = await sb.from("trip_preferences").insert({
+        id: preferences.id,
+        trip_id: preferences.tripId,
+        cabin_class: preferences.cabinClass,
+        preferred_airlines: preferences.preferredAirlines,
+        no_airline_preference: preferences.noAirlinePreference,
+        max_stops: preferences.maxStops,
+        outbound_time_window: preferences.outboundTimeWindow,
+        return_time_window: preferences.returnTimeWindow,
+        budget_min: preferences.budgetMin,
+        budget_max: preferences.budgetMax,
+        seat_preference: preferences.seatPreference,
+        special_assistance: preferences.specialAssistance,
+      });
+      if (prefError) throw new Error(prefError.message);
+
+      if (wallets.length) {
+        const { error: walletError } = await sb.from("loyalty_wallets").insert(
+          wallets.map((w) => ({
+            id: w.id,
+            trip_id: w.tripId,
+            program_id: w.programId,
+            program_label: w.programLabel,
+            kind: w.kind,
+            member_number: w.memberNumber,
+            balance: w.balance,
+          }))
+        );
+        if (walletError && !/loyalty_wallets/i.test(walletError.message)) {
+          throw new Error(walletError.message);
+        }
       }
-    }
+    });
   } else {
     const store = await readStore();
     store.trips.push(trip);
